@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
 import org.apache.commons.configuration2.INIConfiguration
 import java.io.File
+import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
 import java.nio.file.FileSystems
@@ -24,24 +25,21 @@ data class GitRepository(val worktree: Path, val force: Boolean = false) {
     var conf: INIConfiguration = INIConfiguration()
 
     init {
-        println("GitRepository created")
         gitdir = worktree.resolve(".git")
-        println(gitdir)
 
         require((force || this.gitdir.isDirectory())) { "$gitdir is not a Git repository" }
 
         val cf: Path? = repoFile(this, Paths.get("config"))
 
         if (cf != null && cf.isReadable()) {
-
+            FileReader(cf.toFile()).use { reader -> this.conf.read(reader)}
         } else if (!force) {
             throw IOException("Configuration file missing")
         }
 
         if (!force) {
             val vers = this.conf.getProperty("core.repositoryformatversion")
-            require(vers == 0) { "Unsupported repositoryformatversion: $vers" }
-
+            require(vers == "0") { "Unsupported repositoryformatversion: $vers" }
         }
 
 
@@ -122,6 +120,25 @@ fun repoCreate(path: Path): GitRepository {
     return repo
 }
 
+fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitRepository?
+{
+    val path = path.absolute()
+
+    if (path.resolve(".git").isDirectory())
+        return GitRepository(path)
+
+   val parent = path.resolve("..").absolute()
+
+   if (parent == path)
+   {
+       check(required) { "No git directory." }
+
+       return null
+   }
+
+    return repoFind(parent, required)
+}
+
 
 
 class MGit : CliktCommand() {
@@ -134,10 +151,7 @@ class Init : CliktCommand() {
         "Create an empty Git repository or reinitialize an existing one"
 
     override fun run() {
-        println("Executing mgit init...")
-
         repoCreate(Paths.get(path))
-
     }
 }
 
