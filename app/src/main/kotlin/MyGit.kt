@@ -139,6 +139,22 @@ fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitReposito
     return repoFind(parent, required)
 }
 
+abstract class GitObject(data: GitRepository? = null)
+{
+    init {
+        data?.let {deserialize(it) } ?: init()
+    }
+
+    abstract fun serialize(repo: GitRepository): Unit
+
+    abstract  fun deserialize(data: GitRepository): Unit
+
+    open fun init(): Unit
+    {
+
+    }
+}
+
 
 
 class MGit : CliktCommand() {
