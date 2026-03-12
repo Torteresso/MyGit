@@ -1,7 +1,7 @@
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
 import org.apache.commons.configuration2.INIConfiguration
@@ -9,12 +9,11 @@ import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
-import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.zip.Inflater
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
-import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -32,7 +31,7 @@ data class GitRepository(val worktree: Path, val force: Boolean = false) {
         val cf: Path? = repoFile(this, Paths.get("config"))
 
         if (cf != null && cf.isReadable()) {
-            FileReader(cf.toFile()).use { reader -> this.conf.read(reader)}
+            FileReader(cf.toFile()).use { reader -> this.conf.read(reader) }
         } else if (!force) {
             throw IOException("Configuration file missing")
         }
@@ -78,8 +77,7 @@ fun repoDir(repo: GitRepository, vararg path: Path, mkdir: Boolean = false): Pat
     }
 }
 
-fun repoDefaultConfig(): INIConfiguration
-{
+fun repoDefaultConfig(): INIConfiguration {
     val config = INIConfiguration()
     val coreSection = config.getSection("core")  // crée la section si elle n'existe pas
     coreSection.setProperty("repositoryformatversion", "0")
@@ -120,41 +118,139 @@ fun repoCreate(path: Path): GitRepository {
     return repo
 }
 
-fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitRepository?
-{
+fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitRepository? {
     val path = path.absolute()
 
     if (path.resolve(".git").isDirectory())
         return GitRepository(path)
 
-   val parent = path.resolve("..").absolute()
+    val parent = path.resolve("..").absolute()
 
-   if (parent == path)
-   {
-       check(required) { "No git directory." }
+    if (parent == path) {
+        check(required) { "No git directory." }
 
-       return null
-   }
+        return null
+    }
 
     return repoFind(parent, required)
 }
 
-abstract class GitObject(data: GitRepository? = null)
-{
+abstract class GitObject(data: ByteArray? = null) {
     init {
-        data?.let {deserialize(it) } ?: init()
+        data?.let { deserialize(it) } ?: init()
     }
 
     abstract fun serialize(repo: GitRepository): Unit
 
-    abstract  fun deserialize(data: GitRepository): Unit
+    abstract fun deserialize(data: ByteArray): Unit
 
-    open fun init(): Unit
-    {
+    open fun init(): Unit {
 
     }
 }
 
+fun objectRead(repo: GitRepository, sha: String): GitObject? {
+    val path = repoFile(
+        repo, Paths.get("objecs"),
+        Paths.get(sha.substring(0, 2)), Paths.get(sha.substring(2))
+    )
+
+    if (path == null || !path.isReadable()) return null
+
+    val bytesToDecompress = File(path.toString()).readBytes()
+    val raw: ByteArray = ByteArray(bytesToDecompress.size)
+
+    with(Inflater()) {
+        setInput(bytesToDecompress)
+        inflate(raw)
+        end()
+    }
+
+    val fmtIndex = raw.indexOf(" ".toByte())
+    val fmt = raw.sliceArray(0..<fmtIndex)
+
+    val sizeIndex = raw.sliceArray(fmtIndex..raw.size)
+        .indexOf(0x00.toByte())
+    val size = String(raw, fmtIndex, sizeIndex - fmtIndex - 1, Charsets.US_ASCII).toInt()
+
+    require(size == raw.size - sizeIndex - 1) { "Malformed object $sha: bad length" }
+
+    val gitObject = when (fmt.decodeToString()) {
+        "commit" -> GitCommit
+        "tree" -> GitTree
+        "tag" -> GitTag
+        "blob" -> GitBlob
+        else -> throw IOException("Unknow type ${fmt.decodeToString()} for object $sha}")
+    }
+
+    return gitObject.create(raw.sliceArray(sizeIndex + 1..raw.size))
+}
+
+abstract class GitObjectFactory {
+
+    abstract fun create(data: ByteArray? = null): GitObject
+}
+
+class GitCommit(data: ByteArray? = null) : GitObject(data) {
+
+    companion object Factory : GitObjectFactory() {
+        override fun create(data: ByteArray?) = GitCommit(data)
+    }
+
+    override fun serialize(repo: GitRepository) {
+        TODO("Not yet implemented")
+    }
+
+    override fun deserialize(data: ByteArray) {
+        TODO("Not yet implemented")
+    }
+
+}
+
+class GitTree(data: ByteArray? = null) : GitObject(data) {
+
+    companion object Factory : GitObjectFactory() {
+        override fun create(data: ByteArray?) = GitTree(data)
+    }
+
+    override fun serialize(repo: GitRepository) {
+        TODO("Not yet implemented")
+    }
+
+    override fun deserialize(data: ByteArray) {
+        TODO("Not yet implemented")
+    }
+}
+
+class GitTag(data: ByteArray? = null) : GitObject(data) {
+
+    companion object Factory : GitObjectFactory() {
+        override fun create(data: ByteArray?) = GitTag(data)
+    }
+
+    override fun serialize(repo: GitRepository) {
+        TODO("Not yet implemented")
+    }
+
+    override fun deserialize(data: ByteArray) {
+        TODO("Not yet implemented")
+    }
+}
+
+class GitBlob(data: ByteArray? = null) : GitObject(data) {
+
+    companion object Factory : GitObjectFactory() {
+        override fun create(data: ByteArray?) = GitBlob(data)
+    }
+
+    override fun serialize(repo: GitRepository) {
+        TODO("Not yet implemented")
+    }
+
+    override fun deserialize(data: ByteArray) {
+        TODO("Not yet implemented")
+    }
+}
 
 
 class MGit : CliktCommand() {
