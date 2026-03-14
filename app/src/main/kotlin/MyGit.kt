@@ -11,6 +11,9 @@ import java.io.FileWriter
 import java.io.IOException
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.security.MessageDigest
+import java.util.Formatter
+import java.util.zip.Deflater
 import java.util.zip.Inflater
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
@@ -136,11 +139,13 @@ fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitReposito
 }
 
 abstract class GitObject(data: ByteArray? = null) {
+    abstract val fmt: ByteArray
+
     init {
         data?.let { deserialize(it) } ?: init()
     }
 
-    abstract fun serialize(repo: GitRepository): Unit
+    abstract fun serialize(): ByteArray
 
     abstract fun deserialize(data: ByteArray): Unit
 
@@ -186,6 +191,45 @@ fun objectRead(repo: GitRepository, sha: String): GitObject? {
     return gitObject.create(raw.sliceArray(sizeIndex + 1..raw.size))
 }
 
+fun objectWrite(obj: GitObject, repo: GitRepository? = null): String {
+    val data = obj.serialize()
+
+    val result = obj.fmt + " ".toByte() + data.size.toByte() + 0x00.toByte() + data
+
+    val shaInBytes = MessageDigest.getInstance("SHAi1").digest(result)
+    val formatter = Formatter()
+
+    for (b in shaInBytes) {
+        formatter.format("%02x", b)
+    }
+    val sha = formatter.toString()
+
+    if (repo != null) {
+        val path = repoFile(
+            repo, Paths.get("objects"),
+            Paths.get(
+                sha.substring(0..1)
+            ),
+            Paths.get(sha.substring(2..sha.length)), mkdir = true
+        )
+
+        if (path != null && path.exists()) {
+            val objectFile = File(path.toString())
+            val resultCompressed: ByteArray = ByteArray(result.size)
+            with(Deflater())
+            {
+                setInput(result)
+                deflate(resultCompressed)
+                end()
+            }
+            objectFile.writeBytes(resultCompressed)
+        }
+
+    }
+    return sha
+
+}
+
 abstract class GitObjectFactory {
 
     abstract fun create(data: ByteArray? = null): GitObject
@@ -197,7 +241,9 @@ class GitCommit(data: ByteArray? = null) : GitObject(data) {
         override fun create(data: ByteArray?) = GitCommit(data)
     }
 
-    override fun serialize(repo: GitRepository) {
+    override val fmt = "commit".toByteArray()
+
+    override fun serialize(): ByteArray {
         TODO("Not yet implemented")
     }
 
@@ -213,7 +259,9 @@ class GitTree(data: ByteArray? = null) : GitObject(data) {
         override fun create(data: ByteArray?) = GitTree(data)
     }
 
-    override fun serialize(repo: GitRepository) {
+    override val fmt = "tree".toByteArray()
+
+    override fun serialize(): ByteArray {
         TODO("Not yet implemented")
     }
 
@@ -228,7 +276,9 @@ class GitTag(data: ByteArray? = null) : GitObject(data) {
         override fun create(data: ByteArray?) = GitTag(data)
     }
 
-    override fun serialize(repo: GitRepository) {
+    override val fmt = "tag".toByteArray()
+
+    override fun serialize(): ByteArray {
         TODO("Not yet implemented")
     }
 
@@ -243,12 +293,16 @@ class GitBlob(data: ByteArray? = null) : GitObject(data) {
         override fun create(data: ByteArray?) = GitBlob(data)
     }
 
-    override fun serialize(repo: GitRepository) {
-        TODO("Not yet implemented")
+    override val fmt = "blob".toByteArray()
+
+    lateinit var blobData: ByteArray
+
+    override fun serialize(): ByteArray {
+        return blobData
     }
 
     override fun deserialize(data: ByteArray) {
-        TODO("Not yet implemented")
+        blobData = data
     }
 }
 
