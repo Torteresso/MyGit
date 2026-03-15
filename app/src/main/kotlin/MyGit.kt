@@ -4,6 +4,10 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
 import org.apache.commons.configuration2.INIConfiguration
 import java.io.File
 import java.io.FileReader
@@ -306,12 +310,26 @@ class GitBlob(data: ByteArray? = null) : GitObject(data) {
     }
 }
 
+fun catFile(repo: GitRepository, obj: String, fmt: ByteArray? = null) {
+    val obj = objectRead(repo, objectFind(repo, obj, fmt))
+    if (obj != null) System.out.writeBytes(obj.serialize())
+}
+
+fun objectFind(
+    repo: GitRepository,
+    name: String,
+    fmt: ByteArray? = null,
+    follow: Boolean = true
+): String {
+    return name
+}
+
 
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
 
-class Init : CliktCommand() {
+class Init : CliktCommand(name = "init") {
     val path: String by argument().default("./")
     override fun help(context: Context) =
         "Create an empty Git repository or reinitialize an existing one"
@@ -321,7 +339,44 @@ class Init : CliktCommand() {
     }
 }
 
+class CatFile : CliktCommand(name = "cat-file") {
+    val type: String by argument(help = "Specify the type")
+        .choice("blob", "commit", "tag", "tree")
+    val objectName: String by argument(name = "object", help = "The object to display")
+
+    override fun help(context: Context) =
+        "Provide content of repository objects"
+
+    override fun run() {
+        val repo = repoFind()
+        if (repo != null) catFile(repo, objectName, type.toByteArray())
+
+    }
+}
+
+class HashObject : CliktCommand(name = "hash-object") {
+    val type: String by option("-t", help = "Specify the type").choice(
+        "blob",
+        "commit",
+        "tag",
+        "tree"
+    )
+        .default("blob")
+
+    val write: Boolean by option("-w", help = "Actually write the object into the database")
+        .flag(default = false)
+    val path: String by argument(help = "Read object from <file>")
+
+    override fun help(context: Context) =
+        "Compute object ID and optionally creates a blob from a file"
+
+    override fun run() {
+    }
+}
+
 
 fun main(args: Array<String>) = MGit()
     .subcommands(Init())
+    .subcommands(CatFile())
+    .subcommands(HashObject())
     .main(args)
