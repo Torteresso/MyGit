@@ -331,6 +331,18 @@ fun objectFind(
     return name
 }
 
+fun objectHash(fd: File, fmt: ByteArray, repo: GitRepository? = null): String {
+    val data = fd.readBytes()
+
+    val gitObject = when (fmt.decodeToString()) {
+        "commit" -> GitCommit(data)
+        "tree" -> GitTree(data)
+        "tag" -> GitTag(data)
+        "blob" -> GitBlob(data)
+        else -> throw IOException("Unknow type ${fmt.decodeToString()} !")
+    }
+    return objectWrite(gitObject, repo)
+}
 
 class MGit : CliktCommand() {
     override fun run() = Unit
@@ -378,6 +390,11 @@ class HashObject : CliktCommand(name = "hash-object") {
         "Compute object ID and optionally creates a blob from a file"
 
     override fun run() {
+        val repo = if (write) repoFind() else null
+
+        val sha = objectHash(File(path), type.toByteArray(), repo)
+
+        println(sha)
     }
 }
 
