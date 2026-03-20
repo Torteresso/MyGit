@@ -9,6 +9,8 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import org.apache.commons.configuration2.INIConfiguration
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -17,8 +19,9 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
 import java.util.Formatter
-import java.util.zip.Deflater
+import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
+import java.util.zip.InflaterInputStream
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -128,12 +131,13 @@ fun repoCreate(path: Path): GitRepository {
 fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitRepository? {
     val path = path.absolute()
 
-    if (path.resolve(".git").isDirectory())
+    if (path.resolve(".git").isDirectory()) {
         return GitRepository(path)
+    }
 
-    val parent = path.resolve("..").absolute()
+    val parent = path.parent
 
-    if (parent == path) {
+    if (parent == null) {
         check(required) { "No git directory." }
 
         return null
@@ -160,14 +164,19 @@ abstract class GitObject(data: ByteArray? = null) {
 
 fun objectRead(repo: GitRepository, sha: String): GitObject? {
     val path = repoFile(
-        repo, Paths.get("objecs"),
+        repo, Paths.get("objects"),
         Paths.get(sha.substring(0, 2)), Paths.get(sha.substring(2))
     )
 
     if (path == null || !path.isReadable()) return null
 
     val bytesToDecompress = File(path.toString()).readBytes()
-    val raw: ByteArray = ByteArray(bytesToDecompress.size)
+    val raw: ByteArray = ByteArrayOutputStream().use { bos ->
+        InflaterInputStream(ByteArrayInputStream(bytesToDecompress)).use { iip ->
+            iip.copyTo(bos)
+        }
+        bos.toByteArray()
+    }
 
     with(Inflater()) {
         setInput(bytesToDecompress)
@@ -175,12 +184,12 @@ fun objectRead(repo: GitRepository, sha: String): GitObject? {
         end()
     }
 
-    val fmtIndex = raw.indexOf(" ".toByte())
+    val fmtIndex = raw.indexOf(' '.code.toByte())
     val fmt = raw.sliceArray(0..<fmtIndex)
 
-    val sizeIndex = raw.sliceArray(fmtIndex..raw.size)
-        .indexOf(0x00.toByte())
-    val size = String(raw, fmtIndex, sizeIndex - fmtIndex - 1, Charsets.US_ASCII).toInt()
+    val sizeIndex = raw.sliceArray(fmtIndex..<raw.size)
+        .indexOf(0x00.toByte()) + fmtIndex
+    val size = String(raw, fmtIndex + 1, sizeIndex - fmtIndex - 1, Charsets.US_ASCII).toInt()
 
     require(size == raw.size - sizeIndex - 1) { "Malformed object $sha: bad length" }
 
@@ -192,15 +201,15 @@ fun objectRead(repo: GitRepository, sha: String): GitObject? {
         else -> throw IOException("Unknow type ${fmt.decodeToString()} for object $sha}")
     }
 
-    return gitObject.create(raw.sliceArray(sizeIndex + 1..raw.size))
+    return gitObject.create(raw.sliceArray(sizeIndex + 1..<raw.size))
 }
 
 fun objectWrite(obj: GitObject, repo: GitRepository? = null): String {
     val data = obj.serialize()
 
-    val result = obj.fmt + " ".toByte() + data.size.toByte() + 0x00.toByte() + data
+    val result = obj.fmt + " ${data.size}\u0000".toByteArray(Charsets.US_ASCII) + data
 
-    val shaInBytes = MessageDigest.getInstance("SHAi1").digest(result)
+    val shaInBytes = MessageDigest.getInstance("SHA-1").digest(result)
     val formatter = Formatter()
 
     for (b in shaInBytes) {
@@ -214,21 +223,19 @@ fun objectWrite(obj: GitObject, repo: GitRepository? = null): String {
             Paths.get(
                 sha.substring(0..1)
             ),
-            Paths.get(sha.substring(2..sha.length)), mkdir = true
+            Paths.get(sha.substring(2..<sha.length)), mkdir = true
         )
 
-        if (path != null && path.exists()) {
+        if (path != null && !path.exists()) {
             val objectFile = File(path.toString())
-            val resultCompressed: ByteArray = ByteArray(result.size)
-            with(Deflater())
-            {
-                setInput(result)
-                deflate(resultCompressed)
-                end()
+            ByteArrayOutputStream().use { bos ->
+                DeflaterOutputStream(bos).use { dos ->
+                    dos.write(result)
+                    dos.finish()
+                    objectFile.writeBytes(bos.toByteArray())
+                }
             }
-            objectFile.writeBytes(resultCompressed)
         }
-
     }
     return sha
 
