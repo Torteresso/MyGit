@@ -344,6 +344,42 @@ fun objectHash(fd: File, fmt: ByteArray, repo: GitRepository? = null): String {
     return objectWrite(gitObject, repo)
 }
 
+fun kvlmParse(
+    raw: ByteArray, start: Int = 0,
+    dct: MutableMap<ByteArray?, MutableList<ByteArray>> = mutableMapOf<ByteArray?, MutableList<ByteArray>>()
+)
+        : Map<ByteArray?, MutableList<ByteArray>> {
+
+    val spaceIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte())
+    val newLineIndex = raw.sliceArray(start..<raw.size).indexOf('\n'.code.toByte())
+
+    if (spaceIndex !in 0..newLineIndex) {
+        require(newLineIndex == start) { "Malformed commit : $raw" }
+        dct[null] = mutableListOf(raw.sliceArray(start + 1..<raw.size))
+        return dct
+    }
+
+    val key = raw.sliceArray(start..<spaceIndex)
+    var end = start
+
+    while (true) {
+        end = raw.sliceArray((end + 1)..<raw.size).indexOf('\n'.code.toByte())
+        if (raw.elementAt(end + 1) != ' '.code.toByte()) break
+    }
+
+    val value = raw.sliceArray((spaceIndex + 1)..<end).toString(Charsets.US_ASCII)
+        .replace("\n ", "\n")
+        .toByteArray(Charsets.US_ASCII)
+
+    if (key in dct) {
+        dct[key]!!.add(value)
+    } else {
+        dct[key] = mutableListOf(value)
+    }
+
+    return kvlmParse(raw, start = end + 1, dct = dct)
+}
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
