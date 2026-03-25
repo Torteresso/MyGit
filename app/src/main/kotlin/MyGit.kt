@@ -380,6 +380,27 @@ fun kvlmParse(
     return kvlmParse(raw, start = end + 1, dct = dct)
 }
 
+fun kvlmSerialize(kvlm: Map<ByteArray?, MutableList<ByteArray>>): ByteArray {
+    var ret = ByteArray(0)
+
+    for (k in kvlm.keys) {
+        if (k == null) continue
+        val value = kvlm[k]
+
+        if (value != null) {
+            for (v in value) {
+                ret += k + ' '.code.toByte() + v.toString(Charsets.US_ASCII)
+                    .replace("\n", "\n ")
+                    .toByteArray(Charsets.US_ASCII) + '\n'.code.toByte()
+            }
+        }
+    }
+
+    ret += "\n".toByteArray() + kvlm[null]!!.single()
+
+    return ret
+}
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
