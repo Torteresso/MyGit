@@ -253,13 +253,14 @@ class GitCommit(data: ByteArray? = null) : GitObject(data) {
     }
 
     override val fmt = "commit".toByteArray()
+    var kvlm: Map<ByteArray?, MutableList<ByteArray>> = emptyMap()
 
     override fun serialize(): ByteArray {
-        TODO("Not yet implemented")
+        return kvlmSerialize(kvlm)
     }
 
     override fun deserialize(data: ByteArray) {
-        TODO("Not yet implemented")
+        kvlm = kvlmParse(data)
     }
 
 }
@@ -401,6 +402,37 @@ fun kvlmSerialize(kvlm: Map<ByteArray?, MutableList<ByteArray>>): ByteArray {
     return ret
 }
 
+fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
+    if (sha in seen) return
+
+    seen.add(sha)
+
+    val commit = objectRead(repo, sha) as? GitCommit
+        ?: throw IOException("Sha should point to a commit Object in log command.")
+
+    var message = commit.kvlm[null]!!.single().decodeToString().trim()
+    message.replace("\\", "\\\\")
+    message.replace("\"", "\\\"")
+
+
+    if ("\n" in message) {
+        message = message.substring(0..<message.indexOf("\n"))
+    }
+
+    println("  c_$sha [label=\"${sha.substring(0..6)}: $message\"]")
+
+    if ("parent".toByteArray() !in commit.kvlm.keys)
+        return
+
+    val parents = commit.kvlm.getValue("parent".toByteArray())
+
+    for (p in parents) {
+        val pDecoded = p.toString(Charsets.US_ASCII)
+        println("  c_$sha -> c_$p;")
+        logGraphviz(repo, pDecoded, seen)
+    }
+}
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
@@ -455,9 +487,35 @@ class HashObject : CliktCommand(name = "hash-object") {
     }
 }
 
+class Log : CliktCommand(name = "log") {
+    val commit: String by argument(help = "Commit to start at.").default("HEAD")
 
-fun main(args: Array<String>) = MGit()
-    .subcommands(Init())
-    .subcommands(CatFile())
-    .subcommands(HashObject())
-    .main(args)
+    override fun help(context: Context) =
+        "Display history of a given commit."
+
+    override fun run() {
+        val repo = repoFind()
+
+        require(repo != null) { "No git repository was found." }
+
+        println("digraph myGitLog{")
+        println("   node[shape=rect]")
+        logGraphviz(repo, objectFind(repo, commit), mutableSetOf())
+        println("}")
+    }
+}
+
+
+fun main(args: Array<String>) = try {
+    MGit()
+        .subcommands(Init())
+        .subcommands(CatFile())
+        .subcommands(HashObject())
+        .subcommands(Log())
+        .main(args)
+} catch (e: IOException) {
+    System.err.println("IOException : ${e.message}")
+} catch (e: IllegalArgumentException) {
+    System.err.println("IllegalArgumentException : ${e.message}")
+}
+
