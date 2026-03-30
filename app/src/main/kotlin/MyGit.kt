@@ -433,6 +433,42 @@ fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
     }
 }
 
+data class GitTreeLeaf(val mode: ByteArray, val path: String, val sha: String) {}
+
+fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
+    val modeTerminatorIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte())
+
+    require(modeTerminatorIndex - start == 5 || modeTerminatorIndex - start == 6)
+    { "Wrong position for mode terminator of the tree $raw" }
+
+    var mode = raw.sliceArray(start..<modeTerminatorIndex)
+    if (mode.size == 5) mode = "0".toByteArray() + mode
+
+    val pathTerminatorIndex = raw.sliceArray(modeTerminatorIndex..<raw.size)
+        .indexOf(0x00.toByte())
+
+    val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
+
+    val rawSha = raw.sliceArray(pathTerminatorIndex + 1..<pathTerminatorIndex + 21).hashCode()
+
+    val sha = rawSha.toUInt().toString(radix = 16)
+
+    return Pair(pathTerminatorIndex + 21, GitTreeLeaf(mode, path.decodeToString(), sha))
+}
+
+fun treeParse(raw: ByteArray): MutableList<GitTreeLeaf> {
+    var pos = 0
+    val max = raw.size
+    val ret = mutableListOf<GitTreeLeaf>()
+    while (pos < max) {
+        val (newPos, data) = treeParseOne(raw, pos)
+        pos = newPos
+        ret.add(data)
+    }
+    return ret
+}
+
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
