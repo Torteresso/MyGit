@@ -272,13 +272,14 @@ class GitTree(data: ByteArray? = null) : GitObject(data) {
     }
 
     override val fmt = "tree".toByteArray()
+    var items: MutableList<GitTreeLeaf> = mutableListOf()
 
     override fun serialize(): ByteArray {
-        TODO("Not yet implemented")
+        return treeSerialize(this)
     }
 
     override fun deserialize(data: ByteArray) {
-        TODO("Not yet implemented")
+        items = treeParse(data)
     }
 }
 
@@ -465,6 +466,29 @@ fun treeParse(raw: ByteArray): MutableList<GitTreeLeaf> {
         pos = newPos
         ret.add(data)
     }
+    return ret
+}
+
+fun treeSortComparator(leaf1: GitTreeLeaf, leaf2: GitTreeLeaf): Int {
+    val leafPath1 = if (leaf1.mode.first() == "4".toByte()) leaf1.path + "/" else leaf1.path
+    val leafPath2 = if (leaf2.mode.first() == "4".toByte()) leaf2.path + "/" else leaf2.path
+
+    return compareValues(leafPath1, leafPath2)
+}
+
+fun treeSerialize(obj: GitTree): ByteArray {
+    obj.items.sortWith { leaf, leaf1 -> treeSortComparator(leaf, leaf1) }
+
+    var ret: ByteArray = ByteArray(0)
+
+    for (leaf in obj.items) {
+        ret += leaf.mode
+        ret += ' '.code.toByte()
+        ret += leaf.path.encodeToByteArray()
+        ret += 0x00.toByte()
+        ret += leaf.sha.hexToByteArray()
+    }
+
     return ret
 }
 
