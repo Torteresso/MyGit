@@ -492,6 +492,44 @@ fun treeSerialize(obj: GitTree): ByteArray {
     return ret
 }
 
+fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String = "") {
+    val sha = objectFind(repo, ref, "tree".toByteArray())
+    val obj = objectRead(repo, sha) as? GitTree
+        ?: throw IllegalArgumentException("No valid object named $ref")
+
+    for (item in obj.items) {
+        val type =
+            if (item.mode.size == 5) item.mode.sliceArray(0..<1)
+            else item.mode.sliceArray(0..<2)
+
+        val typeName = when (type.decodeToString()) {
+            "04" -> "tree"
+            "10" -> "blob"
+            "12" -> "blob"
+            "16" -> "commit"
+
+            else -> throw IllegalArgumentException("Weird tree leaf mode : ${item.mode}")
+        }
+
+        if ((recursive != null && recursive) || (typeName == "tree")) {
+            println(
+                "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $type ${item.sha}\t${
+                    Paths.get(
+                        prefix
+                    ).resolve(item.path)
+                }"
+            )
+        } else {
+            lsTree(
+                repo, item.sha, recursive,
+                Paths
+                    .get(prefix)
+                    .resolve(item.path).toString()
+            )
+        }
+    }
+}
+
 
 class MGit : CliktCommand() {
     override fun run() = Unit
@@ -565,6 +603,22 @@ class Log : CliktCommand(name = "log") {
     }
 }
 
+class LsTree : CliktCommand(name = "ls-tree") {
+
+
+    val recursive: Boolean by option("-r", help = "Recurse into sub-trees")
+        .flag(default = true)
+    val tree: String by argument(help = "A tree-ish object.")
+
+    override fun help(context: Context) =
+        "Pretty-print a tree object."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+        lsTree(repo, tree, recursive)
+    }
+}
 
 fun main(args: Array<String>) = try {
     MGit()
@@ -572,6 +626,7 @@ fun main(args: Array<String>) = try {
         .subcommands(CatFile())
         .subcommands(HashObject())
         .subcommands(Log())
+        .subcommands(LsTree())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException : ${e.message}")
