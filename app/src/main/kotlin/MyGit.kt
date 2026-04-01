@@ -24,6 +24,7 @@ import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
+import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -530,6 +531,22 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
     }
 }
 
+fun treeCheckout(repo: GitRepository, tree: GitTree, path: Path) {
+    for (item in tree.items) {
+        val obj = objectRead(repo, item.sha)
+        val dest = path.resolve(item.path)
+
+        require(obj != null) { "No valid object for sha ${item.sha}" }
+
+        if (obj.fmt.contentEquals("tree".toByteArray())) {
+            dest.createDirectory()
+            treeCheckout(repo, obj as GitTree, dest)
+        } else if (obj.fmt.contentEquals("blob".toByteArray())) {
+            File(dest.toString()).writeBytes((obj as GitBlob).blobData)
+        }
+    }
+}
+
 
 class MGit : CliktCommand() {
     override fun run() = Unit
@@ -620,6 +637,38 @@ class LsTree : CliktCommand(name = "ls-tree") {
     }
 }
 
+class Checkout : CliktCommand(name = "checkout") {
+
+    val commit: String by argument(help = "The commit or tree to checkout.")
+    val path: String by argument(help = "The EMPTY directory to checkout on.")
+
+    override fun help(context: Context) =
+        "Checkout a commit inside of a directory."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+        var obj = objectRead(repo, objectFind(repo, commit))
+        require(obj != null) { "No valid object named $commit" }
+        if (obj.fmt.contentEquals("commit".toByteArray())) {
+            obj = objectRead(
+                repo,
+                (obj as GitCommit).kvlm["tree".toByteArray()]!!.single().decodeToString()
+            )
+        }
+
+        val pathObj = Paths.get(path)
+        if (pathObj.exists()) {
+            require(pathObj.isDirectory()) { "Not a directory $path" }
+            require(pathObj.listDirectoryEntries().isEmpty()) { "Not empty $path" }
+        } else {
+            pathObj.createDirectory()
+        }
+
+        treeCheckout(repo, (obj as GitTree), pathObj.absolute())
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -627,6 +676,7 @@ fun main(args: Array<String>) = try {
         .subcommands(HashObject())
         .subcommands(Log())
         .subcommands(LsTree())
+        .subcommands(Checkout())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException : ${e.message}")
