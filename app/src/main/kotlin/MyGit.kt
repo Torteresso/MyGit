@@ -547,6 +547,59 @@ fun treeCheckout(repo: GitRepository, tree: GitTree, path: Path) {
     }
 }
 
+fun refResolve(repo: GitRepository, ref: Path): String? {
+    val path = repoFile(repo, ref)
+
+    if (path == null || path.isReadable()) return null
+
+    val data = File(path.toString()).readText().dropLast(1)
+
+    if (data.startsWith("ref: ")) {
+        return refResolve(repo, Paths.get(data.substring(5..<data.length)))
+    }
+    return data
+}
+
+fun refList(repo: GitRepository, path1: Path? = null): MutableMap<Path, Any?> {
+    val path = path1 ?: repoDir(repo, Paths.get("refs"))
+
+    require(path != null) { "Refs directory not found." }
+
+    val allRefs = mutableMapOf<Path, Any?>()
+
+    for (f in path.listDirectoryEntries().sorted()) {
+        val newPath = path.resolve(f)
+
+        if (newPath.isDirectory()) {
+            allRefs[f] = refList(repo, newPath)
+        } else {
+            allRefs[f] = refResolve(repo, newPath)
+        }
+    }
+
+    return allRefs
+}
+
+fun showRef(
+    repo: GitRepository,
+    refs: MutableMap<Path, Any?>,
+    withHash: Boolean = true,
+    prefix: String = ""
+) {
+    val prefix = if (prefix.isNotEmpty()) "$prefix/" else prefix
+
+    for ((k, v) in refs.entries) {
+        if (v is String && withHash) {
+            print("$v $prefix$k")
+        } else if (v is String) {
+            print("$prefix$k")
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            showRef(repo, v as MutableMap<Path, Any?>, withHash, "$prefix$k")
+        }
+    }
+
+}
 
 class MGit : CliktCommand() {
     override fun run() = Unit
@@ -669,6 +722,19 @@ class Checkout : CliktCommand(name = "checkout") {
     }
 }
 
+class ShowRef : CliktCommand(name = "show-ref") {
+
+    override fun help(context: Context) =
+        "List references."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+        val refs = refList(repo)
+        showRef(repo, refs, prefix = "refs")
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -677,6 +743,7 @@ fun main(args: Array<String>) = try {
         .subcommands(Log())
         .subcommands(LsTree())
         .subcommands(Checkout())
+        .subcommands(ShowRef())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException : ${e.message}")
