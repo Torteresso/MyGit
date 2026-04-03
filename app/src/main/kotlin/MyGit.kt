@@ -881,6 +881,26 @@ class Tag : CliktCommand(name = "tag") {
     }
 }
 
+class RevParse : CliktCommand(name = "rev-parse") {
+
+    val type: String? by option("--mgit-type", help = "Specify the  expected type")
+        .choice("blob", "commit", "tag", "tree")
+
+    val name: String by argument(help = "The new tag's name")
+
+    override fun help(context: Context) =
+        "Parse revision (or other objects) identifiers"
+
+    override fun run() {
+        val fmt = type?.encodeToByteArray()
+
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        print(objectFind(repo, name, fmt, follow = true))
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -891,10 +911,11 @@ fun main(args: Array<String>) = try {
         .subcommands(Checkout())
         .subcommands(ShowRef())
         .subcommands(Tag())
+        .subcommands(RevParse())
         .main(args)
 } catch (e: IOException) {
-    System.err.println("IOException : ${e.message}")
+    System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
 } catch (e: IllegalArgumentException) {
-    System.err.println("IllegalArgumentException : ${e.message}")
+    System.err.println("IllegalArgumentException at ${e.stackTrace.first().lineNumber}: ${e.message}")
 }
 
