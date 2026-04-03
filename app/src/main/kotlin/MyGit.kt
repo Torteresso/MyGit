@@ -31,6 +31,14 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
 
+
+// IDEA TODO :
+/*
+* Write and interface with every function so I can implement a functional version vs imperative and compare them (performance, etc...)
+* Write some tests for important functions
+* Refactor into multiple files
+* */
+
 data class GitRepository(val worktree: Path, val force: Boolean = false) {
     val gitdir: Path
     var conf: INIConfiguration = INIConfiguration()
@@ -323,7 +331,9 @@ class GitBlob(data: ByteArray? = null) : GitObject(data) {
 }
 
 fun catFile(repo: GitRepository, obj: String, fmt: ByteArray? = null) {
-    val obj = objectRead(repo, objectFind(repo, obj, fmt))
+    val sha = objectFind(repo, obj, fmt)
+    require(sha != null) { "Could not find sha associated with obj $obj" }
+    val obj = objectRead(repo, sha)
     if (obj != null) System.out.writeBytes(obj.serialize())
 }
 
@@ -332,8 +342,40 @@ fun objectFind(
     name: String,
     fmt: ByteArray? = null,
     follow: Boolean = true
-): String {
-    return name
+): String? {
+    val shaAsList = objectResolve(repo, name)
+
+    require(shaAsList != null) { "No such reference $name." }
+    require(shaAsList.size > 1) {
+        "Ambigous reference $name: Candidates are\n - ${
+            shaAsList.joinToString(
+                "\n - "
+            )
+        }."
+    }
+
+    var sha = shaAsList[0]
+
+
+    if (fmt != null) return sha
+
+    while (true) {
+        require(sha != null) { "Sha should not be null for reference $name." }
+        val obj = objectRead(repo, sha)
+
+        if (obj?.fmt == fmt) return sha
+        if (!follow) return null
+
+        if (obj.fmt.contentEquals("tag".toByteArray())) {
+            sha = (obj as GitTag).kvlm["object"]!!.single().decodeToString()
+        } else if (obj.fmt.contentEquals("commit".toByteArray())
+            && fmt.contentEquals("tree".toByteArray())
+        ) {
+            sha = (obj as GitCommit).kvlm["tree"]!!.single().decodeToString()
+        } else {
+            return null
+        }
+    }
 }
 
 fun objectHash(fd: File, fmt: ByteArray, repo: GitRepository? = null): String {
@@ -497,6 +539,7 @@ fun treeSerialize(obj: GitTree): ByteArray {
 
 fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String = "") {
     val sha = objectFind(repo, ref, "tree".toByteArray())
+    require(sha != null) { "Could not find sha associated with name $ref" }
     val obj = objectRead(repo, sha) as? GitTree
         ?: throw IllegalArgumentException("No valid object named $ref")
 
@@ -606,6 +649,7 @@ fun showRef(
 
 fun tagCreate(repo: GitRepository, name: String, ref: String, createTagObject: Boolean = false) {
     val sha = objectFind(repo, ref)
+    require(sha != null) { "Could not find sha associated with name $ref" }
 
     if (createTagObject) {
         val tag = GitTag()
@@ -628,6 +672,48 @@ fun refCreate(repo: GitRepository, refName: String, sha: String) {
     val path = repoFile(repo, Paths.get("refs/$refName"))
     require(path != null) { "Could not create a correct path to refs/$refName" }
     File(path.toString()).writeText(sha + "\n")
+}
+
+fun objectResolve(repo: GitRepository, name: String): MutableList<String?>? {
+    val candidates = mutableListOf<String?>()
+    val hashRE = "^[0-9A-Fa-f]{4,40}$".toRegex()
+
+    if (name.trim().isEmpty())
+        return null
+
+    if (name == "HEAD") {
+        return mutableListOf<String?>(refResolve(repo, Paths.get("HEAD")))
+    }
+
+    if (hashRE.matches(name)) {
+        val name = name.lowercase()
+        val prefix = name.substring(0..<2)
+        val path = repoDir(repo, Paths.get("objects"), Paths.get(prefix), mkdir = false)
+        if (path != null) {
+            val rem = name.substring(2..<name.length)
+            for (f in path.listDirectoryEntries()) {
+                if (f.startsWith(rem)) {
+                    candidates.add(prefix + f)
+                }
+            }
+        }
+
+    }
+
+    val asTag = refResolve(repo, Paths.get("refs/tags/$name"))
+    if (asTag != null) {
+        candidates.add(asTag)
+    }
+    val asBranch = refResolve(repo, Paths.get("refs/heads/$name"))
+    if (asBranch != null) {
+        candidates.add(asBranch)
+    }
+    val asRemoteBranch = refResolve(repo, Paths.get("refs/remotes/$name"))
+    if (asRemoteBranch != null) {
+        candidates.add(asRemoteBranch)
+    }
+
+    return candidates
 }
 
 class MGit : CliktCommand() {
@@ -697,7 +783,9 @@ class Log : CliktCommand(name = "log") {
 
         println("digraph myGitLog{")
         println("   node[shape=rect]")
-        logGraphviz(repo, objectFind(repo, commit), mutableSetOf())
+        val sha = objectFind(repo, commit)
+        require(sha != null) { "Could not find sha associated with name $commit" }
+        logGraphviz(repo, sha, mutableSetOf())
         println("}")
     }
 }
@@ -730,7 +818,9 @@ class Checkout : CliktCommand(name = "checkout") {
     override fun run() {
         val repo = repoFind()
         require(repo != null) { "No git repository was found." }
-        var obj = objectRead(repo, objectFind(repo, commit))
+        val sha = objectFind(repo, commit)
+        require(sha != null) { "Could not find sha associated with name $commit" }
+        var obj = objectRead(repo, sha)
         require(obj != null) { "No valid object named $commit" }
         if (obj.fmt.contentEquals("commit".toByteArray())) {
             obj = objectRead(
