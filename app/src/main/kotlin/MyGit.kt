@@ -346,7 +346,7 @@ fun objectFind(
     val shaAsList = objectResolve(repo, name)
 
     require(shaAsList != null) { "No such reference $name." }
-    require(shaAsList.size > 1) {
+    require(shaAsList.size == 1) {
         "Ambigous reference $name: Candidates are\n - ${
             shaAsList.joinToString(
                 "\n - "
