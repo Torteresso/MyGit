@@ -16,6 +16,7 @@ import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
@@ -30,6 +31,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
+import kotlin.math.ceil
 
 
 // IDEA TODO :
@@ -495,7 +497,7 @@ fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
 
     val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
 
-    val rawSha = raw.sliceArray(pathTerminatorIndex + 1..<pathTerminatorIndex + 21).hashCode()
+    val rawSha = ByteBuffer.wrap(raw, pathTerminatorIndex + 1, pathTerminatorIndex + 21).int
 
     val sha = rawSha.toUInt().toString(radix = 16)
 
@@ -715,6 +717,115 @@ fun objectResolve(repo: GitRepository, name: String): MutableList<String?>? {
 
     return candidates
 }
+
+data class GitIndexEnTry(
+    val cTime: Pair<Int, Int>,
+    val mTime: Pair<Int, Int>,
+    val dev: Int,
+    val ino: Int,
+    val modeType: Int,
+    val modePerms: Int,
+    val uid: Int,
+    val gid: Int,
+    val fSize: Int,
+    val sha: String,
+    val flagAssumeValid: Boolean,
+    val flagStage: Int,
+    val name: String
+) {
+}
+
+data class GitIndex(
+    val version: Int = 2,
+    val entries: MutableList<GitIndexEnTry> = mutableListOf<GitIndexEnTry>()
+) {
+
+}
+
+fun indexRead(repo: GitRepository): GitIndex {
+    val indexFile = repoFile(repo, Paths.get("index"))
+
+    if (indexFile == null || !indexFile.isReadable()) return GitIndex()
+
+    val raw = File(indexFile.toString()).readBytes()
+
+    val header = raw.sliceArray(0..<12)
+    val signature = header.sliceArray(0..<4)
+    require(signature.contentEquals("DIRC".toByteArray())) { "The signature is not DIRC." }
+    val version = ByteBuffer.wrap(header, 0, 4).int
+    require(version == 2) { "mgit only supports index file version 2" }
+    val count = ByteBuffer.wrap(header, 8, 12).int
+
+    val entries = mutableListOf<GitIndexEnTry>()
+
+    val content = raw.sliceArray(12..<raw.size)
+    var idx = 0
+    for (i in 0..<count) {
+        val cTimeS = ByteBuffer.wrap(content, idx, idx + 4).int
+        val cTimeNs = ByteBuffer.wrap(content, idx + 4, idx + 8).int
+        val mTimeS = ByteBuffer.wrap(content, idx + 8, idx + 12).int
+        val mTimeNs = ByteBuffer.wrap(content, idx + 12, idx + 16).int
+        val dev = ByteBuffer.wrap(content, idx + 16, idx + 20).int
+        val ino = ByteBuffer.wrap(content, idx + 20, idx + 24).int
+        val unused = ByteBuffer.wrap(content, idx + 24, idx + 26).int
+        val mode = ByteBuffer.wrap(content, idx + 26, idx + 28).int
+        val uid = ByteBuffer.wrap(content, idx + 28, idx + 32).int
+        val gid = ByteBuffer.wrap(content, idx + 32, idx + 36).int
+        val sha = ByteBuffer.wrap(content, idx + 36, idx + 40).int.toHexString()
+        val fSize = ByteBuffer.wrap(content, idx + 40, idx + 60).int
+        val flags = ByteBuffer.wrap(content, idx + 60, idx + 62).int
+
+        require(unused == 0) { "Unused variable should be 0" }
+        val modeType = mode.shr(12)
+        require(modeType in listOf(0b1000, 0b1010, 0b1110)) { "Malformed modetype $modeType" }
+        val modePerms = mode.and(0b0000000111111111)
+        val flagAssumeValid = flags.and(0b1000000000000000) != 0
+        val flagExtended = flags.and(0b01000000000000000) != 0
+        require(!flagExtended) { "Extended flag should be false" }
+        val flagStage = flags.and(0b00110000000000000)
+        val nameLength = flags.and(0b0000111111111111)
+
+        idx += 62
+
+        val rawName: ByteArray
+        if (nameLength < 0xFFF) {
+            require(content[idx + nameLength] == 0x00.toByte()) { "We didn't reach the end of the section successfully" }
+            rawName = content.sliceArray(idx..<idx + nameLength)
+            idx += nameLength + 1
+        } else {
+            print("Notice: Name is 0x$nameLength bytes long.")
+            //        /!\ PROBABLY BROKEN /!\
+            val nullIdx = content.sliceArray(idx + 0xFFF..<content.size).indexOf(0x00.toByte())
+            rawName = content.sliceArray(idx..<nullIdx)
+            idx = nullIdx + 1
+        }
+
+        val name = rawName.decodeToString()
+
+        idx = 8 * ceil(idx.toDouble() / 8).toInt()
+
+        entries.add(
+            GitIndexEnTry(
+                cTime = Pair(cTimeS, cTimeNs),
+                mTime = Pair(mTimeS, mTimeNs),
+                dev = dev,
+                ino = ino,
+                modeType = modeType,
+                modePerms = modePerms,
+                uid = uid,
+                gid = gid,
+                fSize = fSize,
+                sha = sha,
+                flagAssumeValid = flagAssumeValid,
+                flagStage = flagStage,
+                name = name
+            )
+        )
+    }
+
+    return GitIndex(version = version, entries = entries)
+}
+
 
 class MGit : CliktCommand() {
     override fun run() = Unit
