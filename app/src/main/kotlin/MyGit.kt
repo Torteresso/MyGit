@@ -595,7 +595,7 @@ fun treeCheckout(repo: GitRepository, tree: GitTree, path: Path) {
 fun refResolve(repo: GitRepository, ref: Path): String? {
     val path = repoFile(repo, ref)
 
-    if (path == null || path.isReadable()) return null
+    if (path == null || !path.isReadable()) return null
 
     val data = File(path.toString()).readText().dropLast(1)
 
