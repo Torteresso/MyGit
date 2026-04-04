@@ -32,6 +32,7 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
 import kotlin.math.ceil
+import kotlin.time.Instant
 
 
 // IDEA TODO :
@@ -1012,6 +1013,47 @@ class RevParse : CliktCommand(name = "rev-parse") {
     }
 }
 
+class LsFiles : CliktCommand(name = "ls-files") {
+
+    val verbose: Boolean by option("--verbose", help = "Show everything").flag(default = true)
+
+    override fun help(context: Context) =
+        "List all the stage files"
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        val index = indexRead(repo)
+        if (verbose) print("Index file format v${index.version}, containing ${index.entries.size} entries.")
+
+        for (e in index.entries) {
+            print(e.name)
+            if (verbose) {
+                val entryType = mapOf(
+                    0b1000 to "regular file",
+                    0b1010 to "symlink",
+                    0b1110 to "git link"
+                )[e.modeType]
+
+                print("  $entryType with perms: ${e.modePerms}")
+                print("  on blob: ${e.sha}")
+                print(
+                    "  created: ${Instant.fromEpochSeconds(e.cTime.first.toLong())}.${e.cTime.second}, modified: ${
+                        Instant.fromEpochSeconds(
+                            e.mTime.first.toLong()
+                        )
+                    }.${e.mTime.second}"
+                )
+                print("  device: ${e.dev}, inode: ${e.ino}")
+                print("  user: ${e.uid}  group: ${e.gid}")
+                print("  flags: stage=${e.flagStage} assume_valid=${e.flagAssumeValid}")
+            }
+        }
+
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -1023,6 +1065,7 @@ fun main(args: Array<String>) = try {
         .subcommands(ShowRef())
         .subcommands(Tag())
         .subcommands(RevParse())
+        .subcommands(LsFiles())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
