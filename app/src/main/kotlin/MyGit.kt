@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
+import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -40,6 +41,7 @@ import kotlin.time.Instant
 * Write and interface with every function so I can implement a functional version vs imperative and compare them (performance, etc...)
 * Write some tests for important functions
 * Refactor into multiple files
+* For the android app, write an interface so that I can use either mGit or the real git. So I can use some command of git that I didn't implement
 * */
 
 data class GitRepository(val worktree: Path, val force: Boolean = false) {
@@ -827,6 +829,116 @@ fun indexRead(repo: GitRepository): GitIndex {
     return GitIndex(version = version, entries = entries)
 }
 
+fun gitignoreParsel(raw: String): Pair<String, Boolean>? {
+    val raw = raw.trim()
+    val firstChar = raw.elementAt(0)
+    if (raw.isEmpty() || firstChar == '#') {
+        return null
+    } else if (firstChar == '!') {
+        return Pair(raw.substring(1..<raw.length), false)
+    } else if (firstChar == '\\') {
+        return Pair(raw.substring(1..<raw.length), true)
+    } else {
+        return Pair(raw, true)
+    }
+}
+
+fun gitignoreParse(lines: List<String>): MutableList<Pair<String, Boolean>?> {
+    val ret = mutableListOf<Pair<String, Boolean>?>()
+
+    for (line in lines) {
+        val parsed = gitignoreParsel(line)
+        if (parsed != null) ret.add(parsed)
+    }
+
+    return ret
+}
+
+data class GitIgnore(
+    val absolute: List<MutableList<Pair<String, Boolean>?>>,
+    val scoped: Map<String, MutableList<Pair<String, Boolean>?>>
+) {}
+
+fun gitignoreRead(repo: GitRepository): GitIgnore {
+    val absolute = mutableListOf<MutableList<Pair<String, Boolean>?>>()
+    val scoped = mutableMapOf<String, MutableList<Pair<String, Boolean>?>>()
+
+    val repoFile = repo.gitdir.resolve("info/exclude")
+    if (repoFile.isReadable()) {
+        absolute.add(gitignoreParse(File(repoFile.toString()).readLines()))
+    }
+
+    val configHome =
+        System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
+    val globalFile = Paths.get(configHome).resolve("git/ignore")
+
+    if (globalFile.isReadable()) {
+        absolute.add(gitignoreParse(File(globalFile.toString()).readLines()))
+    }
+
+    val index = indexRead(repo)
+
+    for (entry in index.entries) {
+        if (entry.name == ".gitignore" || entry.name.endsWith("/.gitignore")) {
+            val dirName = entry.name.split('\\').first()
+            val contents = objectRead(repo, entry.sha)
+            val lines = (contents as GitBlob).blobData.decodeToString().lines()
+            scoped[dirName] = gitignoreParse(lines)
+
+        }
+    }
+
+    return GitIgnore(absolute.toList(), scoped.toMap())
+}
+
+fun checkIgnore1(rules: MutableList<Pair<String, Boolean>?>, path: String): Boolean? {
+    var result: Boolean? = null
+
+    for ((pattern, value) in rules.filterNotNull()) {
+        if (path.matches(pattern.toRegex())) result = value
+    }
+
+    return result
+}
+
+fun checkIgnoreScoped(
+    rules: Map<String, MutableList<Pair<String, Boolean>?>>,
+    path: String
+): Boolean? {
+    val parent = path.split('\\').first()
+
+    while (true) {
+        if (parent in rules) {
+            val result = checkIgnore1(rules.getValue(parent), path)
+            if (result != null) return result
+        }
+        if (parent.isEmpty()) break
+
+        path.split('\\').first()
+    }
+
+    return null
+}
+
+fun checkIgnoreAbsolute(rules: List<MutableList<Pair<String, Boolean>?>>, path: String): Boolean {
+    val parent = path.split('\\').first()
+
+    for (ruleset in rules) {
+        val result = checkIgnore1(ruleset, path)
+        if (result != null) return result
+    }
+
+    return false
+}
+
+fun checkIgnore(rules: GitIgnore, path: String): Boolean {
+    require(!Paths.get(path).isAbsolute) { "The function checkIgnore requires path to be relative to the repository's root" }
+
+    val result = checkIgnoreScoped(rules.scoped, path)
+    if (result != null) return result
+
+    return checkIgnoreAbsolute(rules.absolute, path)
+}
 
 class MGit : CliktCommand() {
     override fun run() = Unit
@@ -1054,6 +1166,27 @@ class LsFiles : CliktCommand(name = "ls-files") {
     }
 }
 
+
+class CheckIgnore : CliktCommand(name = "check-ignore") {
+
+    val paths: List<String> by argument("path", help = "Paths to check").multiple()
+
+    override fun help(context: Context) =
+        "Check path(s) against ignore rules."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        val rules = gitignoreRead(repo)
+        for (path in paths) {
+            if (checkIgnore(rules, path)) {
+                print(path)
+            }
+        }
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -1066,6 +1199,7 @@ fun main(args: Array<String>) = try {
         .subcommands(Tag())
         .subcommands(RevParse())
         .subcommands(LsFiles())
+        .subcommands(CheckIgnore())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
