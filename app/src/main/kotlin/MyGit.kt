@@ -1050,6 +1050,54 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
 
 }
 
+fun Int.toNBytes(n: Int): ByteArray {
+    return ByteBuffer.allocate(n).putInt(this).array()
+}
+
+fun indexWrite(repo: GitRepository, index: GitIndex) {
+    val indexPath =
+        repoFile(repo, Paths.get("index")) ?: throw IOException("Could not find index file.")
+
+    val f = File(indexPath.toString())
+
+    f.writeBytes("DIRC".toByteArray())
+    f.appendBytes(index.version.toNBytes(4))
+    f.appendBytes(index.entries.size.toNBytes(4))
+
+    var idx = 0
+
+    for (e in index.entries) {
+        f.appendBytes(e.cTime.first.toNBytes(4))
+        f.appendBytes(e.cTime.second.toNBytes(4))
+        f.appendBytes(e.mTime.first.toNBytes(4))
+        f.appendBytes(e.mTime.second.toNBytes(4))
+        f.appendBytes(e.dev.toNBytes(4))
+        f.appendBytes(e.ino.toNBytes(4))
+
+        val mode = e.modeType.shl(12).or(e.modePerms)
+        f.appendBytes(mode.toNBytes(4))
+        f.appendBytes(e.uid.toNBytes(4))
+        f.appendBytes(e.gid.toNBytes(4))
+        f.appendBytes(e.fSize.toNBytes(4))
+        f.appendBytes(e.sha.toInt(16).toNBytes(4))
+        val flagAssumeValid = if (e.flagAssumeValid) 0x1.shl(15) else 0
+        val nameBytes = e.name.encodeToByteArray()
+        val nameLength = if (nameBytes.size >= 0xFFF) 0xFFF else nameBytes.size
+
+        f.appendBytes((flagAssumeValid.or(e.flagStage).or(nameLength)).toNBytes(4))
+        f.appendBytes(nameBytes)
+        f.appendBytes(0x00.toNBytes(1))
+
+        idx += 62 + nameBytes.size + 1
+
+        if (idx % 8 != 0) {
+            val pad = 8 - (idx % 8)
+            f.appendBytes(0x00.toNBytes(pad))
+            idx += pad
+        }
+    }
+}
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
@@ -1317,6 +1365,7 @@ class Status : CliktCommand(name = "status") {
 }
 
 fun main(args: Array<String>) = try {
+
     MGit()
         .subcommands(Init())
         .subcommands(CatFile())
