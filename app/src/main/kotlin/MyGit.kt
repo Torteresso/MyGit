@@ -31,6 +31,7 @@ import java.util.zip.InflaterInputStream
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -744,7 +745,7 @@ data class GitIndexEnTry(
 
 data class GitIndex(
     val version: Int = 2,
-    val entries: MutableList<GitIndexEnTry> = mutableListOf<GitIndexEnTry>()
+    var entries: MutableList<GitIndexEnTry> = mutableListOf<GitIndexEnTry>()
 ) {
 
 }
@@ -1009,8 +1010,6 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
 
     val ignore = gitignoreRead(repo)
 
-    val gitDirPrefix = repo.gitdir + System.getProperty("file.separator")
-
     val allFiles = mutableListOf<String>()
 
     repo.worktree.walk().forEach { path ->
@@ -1096,6 +1095,110 @@ fun indexWrite(repo: GitRepository, index: GitIndex) {
             idx += pad
         }
     }
+}
+
+fun rm(
+    repo: GitRepository,
+    paths: List<String>,
+    delete: Boolean = true,
+    skipMissing: Boolean = false
+) {
+    val index = indexRead(repo)
+
+    val absPaths = mutableSetOf<String>()
+
+    for (path in paths) {
+        val absPath = Paths.get(path).absolute()
+        require(absPath.startsWith(repo.worktree)) { "Cannot remove paths outside of worktree: $path" }
+        absPaths.add(absPath.toString())
+    }
+
+    val kepEntries = mutableListOf<GitIndexEnTry>()
+    val remove = mutableListOf<String>()
+
+    for (e in index.entries) {
+        val fullPath = repo.worktree.resolve(e.name).toString()
+
+        if (fullPath in absPaths) {
+            remove.add(fullPath)
+            absPaths.remove(fullPath)
+        } else kepEntries.add(e)
+    }
+
+    require(absPaths.size > 0 || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
+
+    if (delete) {
+        for (path in remove) {
+            throw IOException("FIRST TEST IN DEBUG TO PREVENT UNLUCKY SURPRISES (was going to remove: $path)")
+            Paths.get(path).deleteIfExists()
+        }
+
+    }
+    index.entries = kepEntries
+    indexWrite(repo, index)
+}
+
+fun add(
+    repo: GitRepository,
+    paths: List<String>
+) {
+    rm(repo, paths, delete = false, skipMissing = true)
+
+    val cleanPaths = mutableSetOf<Pair<String, String>>()
+    for (path in paths) {
+        val absPath = Paths.get(path).absolute()
+        require(absPath.startsWith(repo.worktree) && absPath.isReadable()) { "Not a file, or outside the worktree: $paths" }
+
+        val relPath = absPath.relativize(repo.worktree)
+        cleanPaths.add(Pair(absPath.toString(), relPath.toString()))
+    }
+
+    val index = indexRead(repo)
+
+    for ((absPath, relPath) in cleanPaths) {
+        val fd = File(absPath)
+        val sha = objectHash(fd, "blob".toByteArray(), repo)
+
+        val cTimeS =
+            (Files.getAttribute(Paths.get(absPath), "unix:ctime") as FileTime).to(TimeUnit.SECONDS)
+        val cTimeNs = (Files.getAttribute(
+            Paths.get(absPath),
+            "unix:ctime"
+        ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
+        val mTimeS =
+            (Files.getAttribute(Paths.get(absPath), "unix:cmime") as FileTime).to(TimeUnit.SECONDS)
+        val mTimeNs = (Files.getAttribute(
+            Paths.get(absPath),
+            "unix:cmime"
+        ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
+
+        val dev = (Files.getAttribute(Paths.get(absPath), "unix:dev") as Long).toInt()
+        val ino = (Files.getAttribute(Paths.get(absPath), "unix:ino") as Long).toInt()
+        val uid = (Files.getAttribute(Paths.get(absPath), "unix:uid") as Int)
+        val gid = (Files.getAttribute(Paths.get(absPath), "unix:gid") as Int)
+        val fSize = (Files.getAttribute(Paths.get(absPath), "unix:size") as Long).toInt()
+        val modeRaw = (Files.getAttribute(Paths.get(absPath), "unix:mode") as Int)
+
+        val entry = GitIndexEnTry(
+            cTime = Pair(cTimeS.toInt(), cTimeNs.toInt()),
+            mTime = Pair(mTimeS.toInt(), mTimeNs.toInt()),
+            dev = dev,
+            ino = ino,
+            modeType = 0b1000,
+            modePerms = 0b110100100, // 0o644 in binary since Kotlin don't support octal
+            uid = uid,
+            gid = gid,
+            fSize = fSize,
+            sha = sha,
+            flagAssumeValid = false,
+            flagStage = 0,
+            name = relPath
+        )
+
+        index.entries.add(entry)
+    }
+
+    indexWrite(repo, index)
 }
 
 class MGit : CliktCommand() {
@@ -1364,6 +1467,38 @@ class Status : CliktCommand(name = "status") {
     }
 }
 
+
+class Remove : CliktCommand(name = "rm") {
+
+    val paths: List<String> by argument("path", help = "Paths to remove").multiple()
+
+    override fun help(context: Context) =
+        "Remove files from the working tree and the index."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        rm(repo, paths)
+    }
+}
+
+
+class Add : CliktCommand(name = "add") {
+
+    val paths: List<String> by argument("path", help = "Paths to add").multiple()
+
+    override fun help(context: Context) =
+        "Add files contents to the index."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        add(repo, paths)
+    }
+}
+
 fun main(args: Array<String>) = try {
 
     MGit()
@@ -1379,6 +1514,7 @@ fun main(args: Array<String>) = try {
         .subcommands(LsFiles())
         .subcommands(CheckIgnore())
         .subcommands(Status())
+        .subcommands(Remove())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
