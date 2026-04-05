@@ -18,10 +18,13 @@ import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
 import java.util.Formatter
+import java.util.concurrent.TimeUnit
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
@@ -32,6 +35,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.walk
 import kotlin.math.ceil
 import kotlin.time.Instant
 
@@ -940,6 +944,112 @@ fun checkIgnore(rules: GitIgnore, path: String): Boolean {
     return checkIgnoreAbsolute(rules.absolute, path)
 }
 
+fun getActiveBranch(repo: GitRepository): String? {
+    val headFile =
+        repoFile(repo, Paths.get("HEAD")) ?: throw IOException("Could not find HEAD file.")
+
+    val head = File(headFile.toString()).readText()
+
+    if (head.startsWith("ref: refs/heads/")) {
+        return head.substring(16..<head.length)
+    } else return null
+}
+
+fun showStatusBranch(repo: GitRepository) {
+    val branch = getActiveBranch(repo)
+
+    if (branch != null) {
+        println("On branch $branch.")
+    } else {
+        val head = objectFind(repo, "HEAD") ?: throw IOException("Could not find HEAD file.")
+        println("HEAD detached at $head")
+    }
+}
+
+fun convertTreeToDict(
+    repo: GitRepository,
+    ref: String,
+    prefix: String = ""
+): MutableMap<String, String> {
+    val ret = mutableMapOf<String, String>()
+
+    val treeSha = objectFind(repo, ref, fmt = "tree".toByteArray())
+        ?: throw IOException("Could not find $ref object.")
+    val tree = objectRead(repo, treeSha) ?: throw IOException("Could not read object $treeSha.")
+
+    for (leaf in (tree as GitTree).items) {
+        val fullPath = Paths.get(prefix).resolve(leaf.path)
+        val isSubtree = leaf.mode.sliceArray(0..1).contentEquals("04".toByteArray())
+        if (isSubtree) {
+            ret.putAll(convertTreeToDict(repo, leaf.sha, fullPath.toString()))
+        } else {
+            ret[fullPath.toString()] = leaf.sha
+        }
+    }
+    return ret
+}
+
+fun showStatusHeadIndex(repo: GitRepository, index: GitIndex) {
+    println("Changes to be committed:")
+
+    val head = convertTreeToDict(repo, "HEAD")
+    for (entry in index.entries) {
+        if (entry.name in head.keys) {
+            if (head[entry.name] != entry.sha) println("  modified:\t${entry.name}")
+            head.remove(entry.name)
+        } else println("  added:\t${entry.name}")
+    }
+    for (entry in head.keys) {
+        println("  deleted:\t$entry")
+    }
+}
+
+fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
+    println("Changes not staged for commit:")
+
+    val ignore = gitignoreRead(repo)
+
+    val gitDirPrefix = repo.gitdir + System.getProperty("file.separator")
+
+    val allFiles = mutableListOf<String>()
+
+    repo.worktree.walk().forEach { path ->
+        if (!(path.startsWith(repo.gitdir))) {
+            allFiles.add(path.toString())
+        }
+    }
+
+    for (entry in index.entries) {
+        val fullPath = repo.worktree.resolve(entry.name)
+        if (!fullPath.isReadable()) println("  deleted:\t${entry.name}")
+        else {
+            val cTimeNs = (entry.cTime.first * 10e9 + entry.cTime.second).toLong()
+            val mTimeNs = (entry.mTime.first * 10e9 + entry.mTime.second).toLong()
+
+            val fileCTimeNs =
+                (Files.getAttribute(fullPath, "unix:ctime") as FileTime).to(TimeUnit.NANOSECONDS)
+            val fileMTimeNs =
+                (Files.getAttribute(fullPath, "unix:mtime") as FileTime).to(TimeUnit.NANOSECONDS)
+
+            if (cTimeNs != fileCTimeNs || mTimeNs != fileMTimeNs) {
+                val newSha = objectHash(File(fullPath.toString()), "blob".toByteArray(), null)
+
+                if (entry.sha != newSha) println("  modified:\t${entry.name}")
+            }
+        }
+
+        if (entry.name in allFiles) allFiles.remove(entry.name)
+    }
+
+    println()
+    println("Untracked files:")
+
+    for (f in allFiles) {
+        if (!checkIgnore(ignore, f)) print(" \t$f")
+    }
+
+}
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
@@ -987,7 +1097,6 @@ class HashObject : CliktCommand(name = "hash-object") {
 
     override fun run() {
         val repo = if (write) repoFind() else null
-        print
         val sha = objectHash(File(path), type.toByteArray(), repo)
 
         println(sha)
@@ -1187,6 +1296,26 @@ class CheckIgnore : CliktCommand(name = "check-ignore") {
     }
 }
 
+
+class Status : CliktCommand(name = "status") {
+
+
+    override fun help(context: Context) =
+        "Show the working tree status."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        val index = indexRead(repo)
+
+        showStatusBranch(repo)
+        showStatusHeadIndex(repo, index)
+        println()
+        showStatusIndexWorktree(repo, index)
+    }
+}
+
 fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
@@ -1200,6 +1329,7 @@ fun main(args: Array<String>) = try {
         .subcommands(RevParse())
         .subcommands(LsFiles())
         .subcommands(CheckIgnore())
+        .subcommands(Status())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
