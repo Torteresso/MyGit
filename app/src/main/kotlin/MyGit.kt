@@ -641,9 +641,9 @@ fun showRef(
 
     for ((k, v) in refs.entries) {
         if (v is String && withHash) {
-            print("$v $prefix$k")
+            println("$v $prefix$k")
         } else if (v is String) {
-            print("$prefix$k")
+            println("$prefix$k")
         } else {
             @Suppress("UNCHECKED_CAST")
             showRef(repo, v as MutableMap<Path, Any?>, withHash, "$prefix$k")
@@ -796,7 +796,7 @@ fun indexRead(repo: GitRepository): GitIndex {
             rawName = content.sliceArray(idx..<idx + nameLength)
             idx += nameLength + 1
         } else {
-            print("Notice: Name is 0x$nameLength bytes long.")
+            println("Notice: Name is 0x$nameLength bytes long.")
             //        /!\ PROBABLY BROKEN /!\
             val nullIdx = content.sliceArray(idx + 0xFFF..<content.size).indexOf(0x00.toByte())
             rawName = content.sliceArray(idx..<nullIdx)
@@ -987,7 +987,7 @@ class HashObject : CliktCommand(name = "hash-object") {
 
     override fun run() {
         val repo = if (write) repoFind() else null
-
+        print
         val sha = objectHash(File(path), type.toByteArray(), repo)
 
         println(sha)
@@ -1121,7 +1121,7 @@ class RevParse : CliktCommand(name = "rev-parse") {
         val repo = repoFind()
         require(repo != null) { "No git repository was found." }
 
-        print(objectFind(repo, name, fmt, follow = true))
+        println(objectFind(repo, name, fmt, follow = true))
     }
 }
 
@@ -1137,10 +1137,10 @@ class LsFiles : CliktCommand(name = "ls-files") {
         require(repo != null) { "No git repository was found." }
 
         val index = indexRead(repo)
-        if (verbose) print("Index file format v${index.version}, containing ${index.entries.size} entries.")
+        if (verbose) println("Index file format v${index.version}, containing ${index.entries.size} entries.")
 
         for (e in index.entries) {
-            print(e.name)
+            println(e.name)
             if (verbose) {
                 val entryType = mapOf(
                     0b1000 to "regular file",
@@ -1148,18 +1148,18 @@ class LsFiles : CliktCommand(name = "ls-files") {
                     0b1110 to "git link"
                 )[e.modeType]
 
-                print("  $entryType with perms: ${e.modePerms}")
-                print("  on blob: ${e.sha}")
-                print(
+                println("  $entryType with perms: ${e.modePerms}")
+                println("  on blob: ${e.sha}")
+                println(
                     "  created: ${Instant.fromEpochSeconds(e.cTime.first.toLong())}.${e.cTime.second}, modified: ${
                         Instant.fromEpochSeconds(
                             e.mTime.first.toLong()
                         )
                     }.${e.mTime.second}"
                 )
-                print("  device: ${e.dev}, inode: ${e.ino}")
-                print("  user: ${e.uid}  group: ${e.gid}")
-                print("  flags: stage=${e.flagStage} assume_valid=${e.flagAssumeValid}")
+                println("  device: ${e.dev}, inode: ${e.ino}")
+                println("  user: ${e.uid}  group: ${e.gid}")
+                println("  flags: stage=${e.flagStage} assume_valid=${e.flagAssumeValid}")
             }
         }
 
@@ -1181,7 +1181,7 @@ class CheckIgnore : CliktCommand(name = "check-ignore") {
         val rules = gitignoreRead(repo)
         for (path in paths) {
             if (checkIgnore(rules, path)) {
-                print(path)
+                println(path)
             }
         }
     }
