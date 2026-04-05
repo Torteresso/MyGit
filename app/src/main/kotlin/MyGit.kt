@@ -23,6 +23,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
+import java.time.ZonedDateTime
 import java.util.Formatter
 import java.util.concurrent.TimeUnit
 import java.util.zip.DeflaterOutputStream
@@ -36,6 +37,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
 import kotlin.io.path.walk
 import kotlin.math.ceil
 import kotlin.time.Instant
@@ -885,7 +887,7 @@ fun gitignoreRead(repo: GitRepository): GitIgnore {
 
     for (entry in index.entries) {
         if (entry.name == ".gitignore" || entry.name.endsWith("/.gitignore")) {
-            val dirName = entry.name.split('\\').first()
+            val dirName = entry.name.substringBeforeLast('/')
             val contents = objectRead(repo, entry.sha)
             val lines = (contents as GitBlob).blobData.decodeToString().lines()
             scoped[dirName] = gitignoreParse(lines)
@@ -910,7 +912,7 @@ fun checkIgnoreScoped(
     rules: Map<String, MutableList<Pair<String, Boolean>?>>,
     path: String
 ): Boolean? {
-    val parent = path.split('\\').first()
+    val parent = path.substringBeforeLast('/')
 
     while (true) {
         if (parent in rules) {
@@ -919,14 +921,14 @@ fun checkIgnoreScoped(
         }
         if (parent.isEmpty()) break
 
-        path.split('\\').first()
+        path.substringBeforeLast('/')
     }
 
     return null
 }
 
 fun checkIgnoreAbsolute(rules: List<MutableList<Pair<String, Boolean>?>>, path: String): Boolean {
-    val parent = path.split('\\').first()
+    val parent = path.substringBeforeLast('/')
 
     for (ruleset in rules) {
         val result = checkIgnore1(ruleset, path)
@@ -1177,7 +1179,6 @@ fun add(
         val uid = (Files.getAttribute(Paths.get(absPath), "unix:uid") as Int)
         val gid = (Files.getAttribute(Paths.get(absPath), "unix:gid") as Int)
         val fSize = (Files.getAttribute(Paths.get(absPath), "unix:size") as Long).toInt()
-        val modeRaw = (Files.getAttribute(Paths.get(absPath), "unix:mode") as Int)
 
         val entry = GitIndexEnTry(
             cTime = Pair(cTimeS.toInt(), cTimeNs.toInt()),
@@ -1199,6 +1200,114 @@ fun add(
     }
 
     indexWrite(repo, index)
+}
+
+fun gitConfigRead(): INIConfiguration {
+    val userExpansion = System.getProperty("user.home")
+    val xdgConfigHome =
+        System.getenv("XDG_CONFIG_HOME") ?: "$userExpansion/.config"
+    val configFiles = listOf<String>(
+        Paths.get(xdgConfigHome).resolve("git/config").toString()
+            .replaceFirst("~", userExpansion),
+        "$userExpansion/.gitconfig"
+    )
+
+    val config = INIConfiguration()
+    for (file in configFiles) {
+        FileReader(file).use { reader ->
+            config.read(reader)
+        }
+    }
+
+    return config
+}
+
+fun getUserGitConfig(config: INIConfiguration): String? {
+    val userSection = config.getSection("user")
+
+    return if (userSection.containsKey("name") && userSection.containsKey("email")) {
+        "${userSection.getString("name")} <${userSection.getString("email")}"
+    } else null
+}
+
+fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
+    val contents = mutableMapOf<String, MutableList<Any>>()
+    contents[""] = mutableListOf<Any>()
+
+    for (entry in index.entries) {
+        val dirName = entry.name.substringBeforeLast("/")
+
+        var key = dirName
+        while (key != "") {
+            if (key !in contents) contents[key] = mutableListOf<Any>()
+
+            key = key.substringBeforeLast("/")
+        }
+
+        contents.getValue(dirName).add(entry)
+    }
+
+    val sortedPaths = contents.keys.sortedByDescending { it.length }
+
+    var sha: String? = null
+
+    for (path in sortedPaths) {
+        val tree = GitTree()
+
+        var leaf: GitTreeLeaf
+        for (entry in contents.getValue(path)) {
+            if (entry is GitIndexEnTry) {
+                val leafMode = "${entry.modeType}${entry.modePerms}".encodeToByteArray()
+                leaf = GitTreeLeaf(
+                    mode = leafMode,
+                    path = entry.name.substringBeforeLast('/'),
+                    sha = entry.sha
+                )
+            } else if (entry is Pair<*, *>) {
+                leaf = GitTreeLeaf(
+                    mode = "040000".toByteArray(),
+                    path = entry.first as String,
+                    sha = entry.second as String
+                )
+            } else throw IOException("Internal error: entry has the wrong type")
+
+            tree.items.add(leaf)
+        }
+
+        val sha = objectWrite(tree, repo)
+        val parent = path.substringBeforeLast('/')
+        val base = Paths.get(path).name
+        contents.getValue(parent).add(Pair(base, sha))
+    }
+
+    return sha
+}
+
+fun commitCreate(
+    repo: GitRepository,
+    tree: String,
+    parent: String?,
+    author: String,
+    timeStamp: ZonedDateTime,
+    message: String
+): String {
+    val commit = GitCommit()
+    commit.kvlm["tree"] = mutableListOf(tree.encodeToByteArray())
+    if (parent != null) commit.kvlm["parent"] = mutableListOf(parent.encodeToByteArray())
+
+    val message = message.trim() + "\n"
+    val offset = timeStamp.offset.totalSeconds
+    val hours = offset.floorDiv(3600)
+    val minutes = (offset % 3600).floorDiv(60)
+    val tz = String.format("%s%02d%02d", if (offset >= 0) "+" else "-", hours, minutes)
+
+    val author = author + " ${timeStamp.toEpochSecond()} $tz"
+
+    commit.kvlm["author"] = mutableListOf(author.encodeToByteArray())
+    commit.kvlm["committer"] = mutableListOf(author.encodeToByteArray())
+    commit.kvlm[null] = mutableListOf(message.encodeToByteArray())
+
+    return objectWrite(commit, repo)
 }
 
 class MGit : CliktCommand() {
@@ -1499,8 +1608,44 @@ class Add : CliktCommand(name = "add") {
     }
 }
 
-fun main(args: Array<String>) = try {
+class Commit : CliktCommand(name = "commit") {
 
+    val message: String by argument("-m", help = "Message to associate with this commit")
+
+    override fun help(context: Context) =
+        "Record changes to the repository."
+
+    override fun run() {
+        val repo = repoFind()
+        require(repo != null) { "No git repository was found." }
+
+        val index = indexRead(repo)
+        val tree = treeFromIndex(repo, index)
+            ?: throw IOException("Could not find tree from index : $index")
+        val author = getUserGitConfig(gitConfigRead())
+            ?: throw IOException("Could not find author in config.")
+        val commit = commitCreate(
+            repo, tree, objectFind(repo, "HEAD"),
+            author,
+            ZonedDateTime.now(),
+            message
+        )
+
+        val activeBranch = getActiveBranch(repo)
+        if (activeBranch != null) {
+            val path = repoFile(repo, Paths.get("refs/heads").resolve(activeBranch))
+                ?: throw IOException("Could not find active branch path.")
+            File(path.toString()).writeText(commit + "\n")
+        } else {
+            val path = repoFile(repo, Paths.get("HEAD"))
+                ?: throw IOException("Could not find HEAD path.")
+            File(path.toString()).writeText("\n")
+        }
+
+    }
+}
+
+fun main(args: Array<String>) = try {
     MGit()
         .subcommands(Init())
         .subcommands(CatFile())
