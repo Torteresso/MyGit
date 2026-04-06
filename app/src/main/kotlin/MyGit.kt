@@ -32,7 +32,6 @@ import java.util.zip.InflaterInputStream
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
-import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -52,11 +51,10 @@ import kotlin.time.Instant
 * */
 
 data class GitRepository(val worktree: Path, val force: Boolean = false) {
-    val gitdir: Path
+    val gitdir: Path = worktree.resolve(".git")
     var conf: INIConfiguration = INIConfiguration()
 
     init {
-        gitdir = worktree.resolve(".git")
 
         require((force || this.gitdir.isDirectory())) { "$gitdir is not a Git repository" }
 
@@ -69,8 +67,8 @@ data class GitRepository(val worktree: Path, val force: Boolean = false) {
         }
 
         if (!force) {
-            val vers = this.conf.getProperty("core.repositoryformatversion")
-            require(vers == "0") { "Unsupported repositoryformatversion: $vers" }
+            val version = this.conf.getProperty("core.repositoryformatversion")
+            require(version == "0") { "Unsupported repositoryformatversion: $version" }
         }
 
 
@@ -111,7 +109,7 @@ fun repoDir(repo: GitRepository, vararg path: Path, mkdir: Boolean = false): Pat
 
 fun repoDefaultConfig(): INIConfiguration {
     val config = INIConfiguration()
-    val coreSection = config.getSection("core")  // crée la section si elle n'existe pas
+    val coreSection = config.getSection("core")  // create the section if she doesn't exist
     coreSection.setProperty("repositoryformatversion", "0")
     coreSection.setProperty("filemode", "false")
     coreSection.setProperty("bare", "false")
@@ -177,9 +175,9 @@ abstract class GitObject(data: ByteArray? = null) {
 
     abstract fun serialize(): ByteArray
 
-    abstract fun deserialize(data: ByteArray): Unit
+    abstract fun deserialize(data: ByteArray)
 
-    open fun init(): Unit {
+    open fun init() {
 
     }
 }
@@ -359,7 +357,7 @@ fun objectFind(
 
     require(shaAsList != null) { "No such reference $name." }
     require(shaAsList.size == 1) {
-        "Ambigous reference $name: Candidates are\n - ${
+        "Ambiguous reference $name: Candidates are\n - ${
             shaAsList.joinToString(
                 "\n - "
             )
@@ -378,12 +376,12 @@ fun objectFind(
         if (obj?.fmt == fmt) return sha
         if (!follow) return null
 
-        if (obj.fmt.contentEquals("tag".toByteArray())) {
-            sha = (obj as GitTag).kvlm["object"]!!.single().decodeToString()
+        sha = if (obj.fmt.contentEquals("tag".toByteArray())) {
+            (obj as GitTag).kvlm["object"]!!.single().decodeToString()
         } else if (obj.fmt.contentEquals("commit".toByteArray())
             && fmt.contentEquals("tree".toByteArray())
         ) {
-            sha = (obj as GitCommit).kvlm["tree"]!!.single().decodeToString()
+            (obj as GitCommit).kvlm["tree"]!!.single().decodeToString()
         } else {
             return null
         }
@@ -405,7 +403,7 @@ fun objectHash(fd: File, fmt: ByteArray, repo: GitRepository? = null): String {
 
 fun kvlmParse(
     raw: ByteArray, start: Int = 0,
-    dct: MutableMap<String?, MutableList<ByteArray>> = mutableMapOf<String?, MutableList<ByteArray>>()
+    dct: MutableMap<String?, MutableList<ByteArray>> = mutableMapOf()
 )
         : MutableMap<String?, MutableList<ByteArray>> {
 
@@ -491,7 +489,7 @@ fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
     }
 }
 
-data class GitTreeLeaf(val mode: ByteArray, val path: String, val sha: String) {}
+data class GitTreeLeaf(val mode: ByteArray, val path: String, val sha: String)
 
 fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
     val modeTerminatorIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte())
@@ -536,7 +534,7 @@ fun treeSortComparator(leaf1: GitTreeLeaf, leaf2: GitTreeLeaf): Int {
 fun treeSerialize(obj: GitTree): ByteArray {
     obj.items.sortWith { leaf, leaf1 -> treeSortComparator(leaf, leaf1) }
 
-    var ret: ByteArray = ByteArray(0)
+    var ret = ByteArray(0)
 
     for (leaf in obj.items) {
         ret += leaf.mode
@@ -647,13 +645,19 @@ fun showRef(
     val prefix = if (prefix.isNotEmpty()) "$prefix/" else prefix
 
     for ((k, v) in refs.entries) {
-        if (v is String && withHash) {
-            println("$v $prefix$k")
-        } else if (v is String) {
-            println("$prefix$k")
-        } else {
-            @Suppress("UNCHECKED_CAST")
-            showRef(repo, v as MutableMap<Path, Any?>, withHash, "$prefix$k")
+        when (v) {
+            is String if withHash -> {
+                println("$v $prefix$k")
+            }
+
+            is String -> {
+                println("$prefix$k")
+            }
+
+            else -> {
+                @Suppress("UNCHECKED_CAST")
+                showRef(repo, v as MutableMap<Path, Any?>, withHash, "$prefix$k")
+            }
         }
     }
 
@@ -668,7 +672,7 @@ fun tagCreate(repo: GitRepository, name: String, ref: String, createTagObject: B
         tag.kvlm["object"] = mutableListOf(sha.encodeToByteArray())
         tag.kvlm["type"] = mutableListOf("commit".toByteArray())
         tag.kvlm["tag"] = mutableListOf(name.encodeToByteArray())
-        tag.kvlm["tagger"] = mutableListOf("Mgit <mgit@example.com>".toByteArray())
+        tag.kvlm["tagger"] = mutableListOf("mgit <mgit@example.com>".toByteArray())
         tag.kvlm[null] =
             mutableListOf("A tag generated by mgit, which won't let you customize the message:\n".toByteArray())
 
@@ -694,7 +698,7 @@ fun objectResolve(repo: GitRepository, name: String): MutableList<String?>? {
         return null
 
     if (name == "HEAD") {
-        return mutableListOf<String?>(refResolve(repo, Paths.get("HEAD")))
+        return mutableListOf(refResolve(repo, Paths.get("HEAD")))
     }
 
     if (hashRE.matches(name)) {
@@ -742,15 +746,12 @@ data class GitIndexEnTry(
     val flagAssumeValid: Boolean,
     val flagStage: Int,
     val name: String
-) {
-}
+)
 
 data class GitIndex(
     val version: Int = 2,
-    var entries: MutableList<GitIndexEnTry> = mutableListOf<GitIndexEnTry>()
-) {
-
-}
+    var entries: MutableList<GitIndexEnTry> = mutableListOf()
+)
 
 fun indexRead(repo: GitRepository): GitIndex {
     val indexFile = repoFile(repo, Paths.get("index"))
@@ -770,7 +771,7 @@ fun indexRead(repo: GitRepository): GitIndex {
 
     val content = raw.sliceArray(12..<raw.size)
     var idx = 0
-    for (i in 0..<count) {
+    repeat(count) {
         val cTimeS = ByteBuffer.wrap(content, idx, idx + 4).int
         val cTimeNs = ByteBuffer.wrap(content, idx + 4, idx + 8).int
         val mTimeS = ByteBuffer.wrap(content, idx + 8, idx + 12).int
@@ -839,14 +840,14 @@ fun indexRead(repo: GitRepository): GitIndex {
 fun gitignoreParsel(raw: String): Pair<String, Boolean>? {
     val raw = raw.trim()
     val firstChar = raw.elementAt(0)
-    if (raw.isEmpty() || firstChar == '#') {
-        return null
+    return if (raw.isEmpty() || firstChar == '#') {
+        null
     } else if (firstChar == '!') {
-        return Pair(raw.substring(1..<raw.length), false)
+        Pair(raw.substring(1..<raw.length), false)
     } else if (firstChar == '\\') {
-        return Pair(raw.substring(1..<raw.length), true)
+        Pair(raw.substring(1..<raw.length), true)
     } else {
-        return Pair(raw, true)
+        Pair(raw, true)
     }
 }
 
@@ -864,7 +865,7 @@ fun gitignoreParse(lines: List<String>): MutableList<Pair<String, Boolean>?> {
 data class GitIgnore(
     val absolute: List<MutableList<Pair<String, Boolean>?>>,
     val scoped: Map<String, MutableList<Pair<String, Boolean>?>>
-) {}
+)
 
 fun gitignoreRead(repo: GitRepository): GitIgnore {
     val absolute = mutableListOf<MutableList<Pair<String, Boolean>?>>()
@@ -928,8 +929,6 @@ fun checkIgnoreScoped(
 }
 
 fun checkIgnoreAbsolute(rules: List<MutableList<Pair<String, Boolean>?>>, path: String): Boolean {
-    val parent = path.substringBeforeLast('/')
-
     for (ruleset in rules) {
         val result = checkIgnore1(ruleset, path)
         if (result != null) return result
@@ -953,9 +952,9 @@ fun getActiveBranch(repo: GitRepository): String? {
 
     val head = File(headFile.toString()).readText()
 
-    if (head.startsWith("ref: refs/heads/")) {
-        return head.substring(16..<head.length)
-    } else return null
+    return if (head.startsWith("ref: refs/heads/")) {
+        head.substring(16..<head.length)
+    } else null
 }
 
 fun showStatusBranch(repo: GitRepository) {
@@ -1127,12 +1126,12 @@ fun rm(
         } else kepEntries.add(e)
     }
 
-    require(absPaths.size > 0 || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
+    require(absPaths.isNotEmpty() || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
 
     if (delete) {
         for (path in remove) {
             throw IOException("FIRST TEST IN DEBUG TO PREVENT UNLUCKY SURPRISES (was going to remove: $path)")
-            Paths.get(path).deleteIfExists()
+            //Paths.get(path).deleteIfExists()
         }
 
     }
@@ -1168,10 +1167,10 @@ fun add(
             "unix:ctime"
         ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
         val mTimeS =
-            (Files.getAttribute(Paths.get(absPath), "unix:cmime") as FileTime).to(TimeUnit.SECONDS)
+            (Files.getAttribute(Paths.get(absPath), "unix:mtime") as FileTime).to(TimeUnit.SECONDS)
         val mTimeNs = (Files.getAttribute(
             Paths.get(absPath),
-            "unix:cmime"
+            "unix:mtime"
         ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
 
         val dev = (Files.getAttribute(Paths.get(absPath), "unix:dev") as Long).toInt()
@@ -1206,7 +1205,7 @@ fun gitConfigRead(): INIConfiguration {
     val userExpansion = System.getProperty("user.home")
     val xdgConfigHome =
         System.getenv("XDG_CONFIG_HOME") ?: "$userExpansion/.config"
-    val configFiles = listOf<String>(
+    val configFiles = listOf(
         Paths.get(xdgConfigHome).resolve("git/config").toString()
             .replaceFirst("~", userExpansion),
         "$userExpansion/.gitconfig"
@@ -1232,14 +1231,14 @@ fun getUserGitConfig(config: INIConfiguration): String? {
 
 fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
     val contents = mutableMapOf<String, MutableList<Any>>()
-    contents[""] = mutableListOf<Any>()
+    contents[""] = mutableListOf()
 
     for (entry in index.entries) {
         val dirName = entry.name.substringBeforeLast("/")
 
         var key = dirName
         while (key != "") {
-            if (key !in contents) contents[key] = mutableListOf<Any>()
+            if (key !in contents) contents[key] = mutableListOf()
 
             key = key.substringBeforeLast("/")
         }
@@ -1256,25 +1255,31 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
 
         var leaf: GitTreeLeaf
         for (entry in contents.getValue(path)) {
-            if (entry is GitIndexEnTry) {
-                val leafMode = "${entry.modeType}${entry.modePerms}".encodeToByteArray()
-                leaf = GitTreeLeaf(
-                    mode = leafMode,
-                    path = entry.name.substringBeforeLast('/'),
-                    sha = entry.sha
-                )
-            } else if (entry is Pair<*, *>) {
-                leaf = GitTreeLeaf(
-                    mode = "040000".toByteArray(),
-                    path = entry.first as String,
-                    sha = entry.second as String
-                )
-            } else throw IOException("Internal error: entry has the wrong type")
+            when (entry) {
+                is GitIndexEnTry -> {
+                    val leafMode = "${entry.modeType}${entry.modePerms}".encodeToByteArray()
+                    leaf = GitTreeLeaf(
+                        mode = leafMode,
+                        path = entry.name.substringBeforeLast('/'),
+                        sha = entry.sha
+                    )
+                }
+
+                is Pair<*, *> -> {
+                    leaf = GitTreeLeaf(
+                        mode = "040000".toByteArray(),
+                        path = entry.first as String,
+                        sha = entry.second as String
+                    )
+                }
+
+                else -> throw IOException("Internal error: entry has the wrong type")
+            }
 
             tree.items.add(leaf)
         }
 
-        val sha = objectWrite(tree, repo)
+        sha = objectWrite(tree, repo)
         val parent = path.substringBeforeLast('/')
         val base = Paths.get(path).name
         contents.getValue(parent).add(Pair(base, sha))
@@ -1660,6 +1665,7 @@ fun main(args: Array<String>) = try {
         .subcommands(CheckIgnore())
         .subcommands(Status())
         .subcommands(Remove())
+        .subcommands(Commit())
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
