@@ -2,19 +2,23 @@ import com.github.ajalt.clikt.testing.test
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
 import kotlin.io.path.createFile
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.writeText
 
 @Target(AnnotationTarget.FUNCTION)
-annotation class SkipAfterEach
+annotation class SkipGitFolderCheck
 
 class MyGitTest {
 
@@ -25,11 +29,11 @@ class MyGitTest {
     fun checkGitFolderBasicStructure(testInfo: TestInfo)
     {
         val method = testInfo.testMethod.orElse(null)
-        if (method?.getAnnotation(SkipAfterEach::class.java) != null) {
+        if (method?.getAnnotation(SkipGitFolderCheck::class.java) != null) {
             return
         }
 
-            assertTrue(workingDirectory.resolve(".git").isDirectory())
+        assertTrue(workingDirectory.resolve(".git").isDirectory())
         assertTrue(workingDirectory.resolve(".git/branches").isDirectory())
         assertTrue(workingDirectory.resolve(".git/objects").isDirectory())
         assertTrue(workingDirectory.resolve(".git/refs/tags").isDirectory())
@@ -51,7 +55,7 @@ class MyGitTest {
     }
 
     @Test
-    @SkipAfterEach
+    @SkipGitFolderCheck
     fun initCommand_NonEmptyDir_MyGitDirIsReinitialize() {
         workingDirectory.resolve(".git").createDirectory()
         workingDirectory.resolve(".git/test.txt").createFile()
@@ -60,5 +64,18 @@ class MyGitTest {
         assertThrows<IllegalArgumentException> { command.test(workingDirectory.toString() )}
     }
 
+    @SkipGitFolderCheck
+    @Test
+    fun hashObjectCommand_ForBlobFile_PrintSha()
+    {
+        val testFile = workingDirectory.resolve("test.txt")
+        testFile.writeText("This is a test.\n")
+        assertTrue(testFile.isReadable())
+        val command = HashObject()
+        val result = command.test(testFile.toString())
+
+        assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", result.output)
+
+    }
 
 }
