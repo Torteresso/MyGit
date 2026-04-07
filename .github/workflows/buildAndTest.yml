@@ -13,3 +13,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: Build with Gradle
         run: ./gradlew build
+      - name: Test MyGit
+        run: gradle test
