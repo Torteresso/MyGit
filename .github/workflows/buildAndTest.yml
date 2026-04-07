@@ -9,7 +9,5 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - name: Build with Gradle
+      - name: Build with Gradle and test
         run: ./gradlew build
-      - name: Test MyGit
-        run: gradle test
