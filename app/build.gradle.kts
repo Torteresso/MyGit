@@ -17,6 +17,15 @@ dependencies {
 
     implementation("org.apache.commons:commons-configuration2:2.13.0")
 
+    // Tests
+    testImplementation(platform("org.junit:junit-bom:6.0.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.named<Test>("test") {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
 }
 
 
