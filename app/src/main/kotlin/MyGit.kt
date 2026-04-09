@@ -708,6 +708,7 @@ fun objectResolve(repo: GitRepository, name: String): MutableList<String?>? {
         if (path != null) {
             val rem = name.substring(2..<name.length)
             for (f in path.listDirectoryEntries()) {
+                val f = path.relativize(f)
                 if (f.startsWith(rem)) {
                     candidates.add(prefix + f)
                 }
