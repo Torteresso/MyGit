@@ -108,8 +108,21 @@ class MyGitTest {
         val command = HashObject()
         val result = command.test(testFile.toString())
 
-        assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", result.output)
+        assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
+    }
 
+    @Test
+    fun hashObjectCommand_ForBlobFileWithWrite_WriteAndPrintSha()
+    {
+        val testFile = workingDirectory.resolve("test.txt")
+        testFile.writeText("This is a test.\n")
+        assertTrue(testFile.isReadable())
+
+        Init().test(workingDirectory.toString())
+        HashObject().test("-w ${testFile.toString()}")
+
+        assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
+        assertTrue(workingDirectory.resolve(".git/objects/48/4ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81").isReadable())
     }
 
 }
