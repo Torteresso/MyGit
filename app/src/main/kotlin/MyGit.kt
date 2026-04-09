@@ -148,7 +148,7 @@ fun repoCreate(path: Path): GitRepository {
     return repo
 }
 
-fun repoFind(path: Path = Paths.get("."), required: Boolean = true): GitRepository? {
+fun repoFind(path: Path = Paths.get(System.getProperty("user.dir")), required: Boolean = true): GitRepository? {
     val path = path.toRealPath()
 
     if (path.resolve(".git").isDirectory()) {
