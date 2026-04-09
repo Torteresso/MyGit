@@ -6,11 +6,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
-import org.junit.jupiter.api.TestReporter
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.PrintStream
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
@@ -105,24 +103,41 @@ class MyGitTest {
         val testFile = workingDirectory.resolve("test.txt")
         testFile.writeText("This is a test.\n")
         assertTrue(testFile.isReadable())
-        val command = HashObject()
-        val result = command.test(testFile.toString())
+        HashObject().test(testFile.toString())
 
         assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
     }
 
-    @Test
-    fun hashObjectCommand_ForBlobFileWithWrite_WriteAndPrintSha()
+    fun writeSomeTestsFilesInGitRepo()
     {
         val testFile = workingDirectory.resolve("test.txt")
         testFile.writeText("This is a test.\n")
         assertTrue(testFile.isReadable())
 
         Init().test(workingDirectory.toString())
-        HashObject().test("-w ${testFile.toString()}")
+        HashObject().test("-w $testFile")
+    }
+
+    @Test
+    fun hashObjectCommand_ForBlobFileWithWrite_WriteAndPrintSha()
+    {
+       writeSomeTestsFilesInGitRepo()
+
+
 
         assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
         assertTrue(workingDirectory.resolve(".git/objects/48/4ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81").isReadable())
+    }
+
+    @Test
+    fun catFileCommand_ForExistingBlobFile_PrintItsContent()
+    {
+        writeSomeTestsFilesInGitRepo()
+        outContent.reset()
+
+        CatFile().test("blob 484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81")
+
+        assertEquals("This is a test.\n", outContent.toString())
     }
 
 }
