@@ -6,9 +6,12 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
+import org.junit.jupiter.api.TestReporter
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.PrintStream
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
 import kotlin.io.path.createFile
@@ -25,6 +28,37 @@ class MyGitTest {
     @TempDir
     lateinit var workingDirectory: Path
 
+    lateinit var userDir: String
+
+    private val outContent = ByteArrayOutputStream()
+    private val originalOut = System.out
+
+    @BeforeEach
+    fun changeOutPutStream() {
+        System.setOut(PrintStream(outContent))
+    }
+
+    @Order(3)
+    @AfterEach
+    fun restoreOutPutStream() {
+        System.setOut(originalOut)
+    }
+
+    @BeforeEach
+    fun changeCurrentDir()
+    {
+        userDir = System.getProperty("user.dir")
+        System.setProperty("user.dir", workingDirectory.toString())
+    }
+
+    @Order(2)
+    @AfterEach
+    fun restoreCurrentDir()
+    {
+        System.setProperty("user.dir", userDir)
+    }
+
+    @Order(1)
     @AfterEach
     fun checkGitFolderBasicStructure(testInfo: TestInfo)
     {
