@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import org.apache.commons.configuration2.INIConfiguration
 import java.io.ByteArrayInputStream
@@ -367,13 +368,14 @@ fun objectFind(
     var sha = shaAsList[0]
 
 
-    if (fmt != null) return sha
+    if (fmt == null) return sha
 
     while (true) {
         require(sha != null) { "Sha should not be null for reference $name." }
         val obj = objectRead(repo, sha)
+        require(obj != null){"Could not read object with sha : $sha"}
 
-        if (obj?.fmt == fmt) return sha
+        if (obj.fmt.contentEquals(fmt)) return sha
         if (!follow) return null
 
         sha = if (obj.fmt.contentEquals("tag".toByteArray())) {
@@ -954,7 +956,7 @@ fun getActiveBranch(repo: GitRepository): String? {
     val head = File(headFile.toString()).readText()
 
     return if (head.startsWith("ref: refs/heads/")) {
-        head.substring(16..<head.length)
+        head.substring(16..<head.length -1)
     } else null
 }
 
@@ -1202,31 +1204,33 @@ fun add(
     indexWrite(repo, index)
 }
 
-fun gitConfigRead(): INIConfiguration {
+fun gitConfigRead(): INIConfiguration? {
     val userExpansion = System.getProperty("user.home")
     val xdgConfigHome =
-        System.getenv("XDG_CONFIG_HOME") ?: "$userExpansion/.config"
+        System.getenv("XDG_CONFIG_HOME") ?: "$userExpansion"
     val configFiles = listOf(
-        Paths.get(xdgConfigHome).resolve("git/config").toString()
+        Paths.get(xdgConfigHome).resolve(".gitconfig").toString()
             .replaceFirst("~", userExpansion),
         "$userExpansion/.gitconfig"
     )
 
     val config = INIConfiguration()
     for (file in configFiles) {
+        if (!Paths.get(file).isReadable()) continue
         FileReader(file).use { reader ->
             config.read(reader)
         }
     }
 
-    return config
+    return if (config.isEmpty()) null else config
 }
 
-fun getUserGitConfig(config: INIConfiguration): String? {
+fun getUserGitConfig(config: INIConfiguration?): String? {
+    if (config == null) return null
     val userSection = config.getSection("user")
 
     return if (userSection.containsKey("name") && userSection.containsKey("email")) {
-        "${userSection.getString("name")} <${userSection.getString("email")}"
+        "${userSection.getString("name")} <${userSection.getString("email")}>"
     } else null
 }
 
@@ -1616,7 +1620,7 @@ class Add : CliktCommand(name = "add") {
 
 class Commit : CliktCommand(name = "commit") {
 
-    val message: String by argument("-m", help = "Message to associate with this commit")
+    val message: String by option("-m", help = "Message to associate with this commit").required()
 
     override fun help(context: Context) =
         "Record changes to the repository."
@@ -1629,7 +1633,7 @@ class Commit : CliktCommand(name = "commit") {
         val tree = treeFromIndex(repo, index)
             ?: throw IOException("Could not find tree from index : $index")
         val author = getUserGitConfig(gitConfigRead())
-            ?: throw IOException("Could not find author in config.")
+            ?: "Example User <could.notFind@GitConfigFile.com"
         val commit = commitCreate(
             repo, tree, objectFind(repo, "HEAD"),
             author,
