@@ -409,8 +409,8 @@ fun kvlmParse(
 )
         : MutableMap<String?, MutableList<ByteArray>> {
 
-    val spaceIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte())
-    val newLineIndex = raw.sliceArray(start..<raw.size).indexOf('\n'.code.toByte())
+    val spaceIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte()) + start
+    val newLineIndex = raw.sliceArray(start..<raw.size).indexOf('\n'.code.toByte()) + start
 
     if (spaceIndex !in 0..newLineIndex) {
         require(newLineIndex == start) { "Malformed commit : $raw" }
@@ -422,7 +422,7 @@ fun kvlmParse(
     var end = start
 
     while (true) {
-        end = raw.sliceArray((end + 1)..<raw.size).indexOf('\n'.code.toByte())
+        end = raw.sliceArray((end + 1)..<raw.size).indexOf('\n'.code.toByte()) + (end + 1)
         if (raw.elementAt(end + 1) != ' '.code.toByte()) break
     }
 
@@ -494,7 +494,7 @@ fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
 data class GitTreeLeaf(val mode: ByteArray, val path: String, val sha: String)
 
 fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
-    val modeTerminatorIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte())
+    val modeTerminatorIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte()) + start
 
     require(modeTerminatorIndex - start == 5 || modeTerminatorIndex - start == 6)
     { "Wrong position for mode terminator of the tree $raw" }
@@ -503,7 +503,7 @@ fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
     if (mode.size == 5) mode = "0".toByteArray() + mode
 
     val pathTerminatorIndex = raw.sliceArray(modeTerminatorIndex..<raw.size)
-        .indexOf(0x00.toByte())
+        .indexOf(0x00.toByte()) + modeTerminatorIndex
 
     val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
 
@@ -809,7 +809,7 @@ fun indexRead(repo: GitRepository): GitIndex {
         } else {
             println("Notice: Name is 0x$nameLength bytes long.")
             //        /!\ PROBABLY BROKEN /!\
-            val nullIdx = content.sliceArray(idx + 0xFFF..<content.size).indexOf(0x00.toByte())
+            val nullIdx = content.sliceArray(idx + 0xFFF..<content.size).indexOf(0x00.toByte()) + idx + 0xFFF
             rawName = content.sliceArray(idx..<nullIdx)
             idx = nullIdx + 1
         }
