@@ -274,7 +274,7 @@ class GitCommit(data: ByteArray? = null) : GitObject(data) {
     }
 
     override val fmt = "commit".toByteArray()
-    var kvlm: MutableMap<String?, MutableList<ByteArray>> = mutableMapOf()
+    lateinit var kvlm: MutableMap<String?, MutableList<ByteArray>>
 
     override fun serialize(): ByteArray {
         return kvlmSerialize(kvlm)
@@ -293,7 +293,7 @@ class GitTree(data: ByteArray? = null) : GitObject(data) {
     }
 
     override val fmt = "tree".toByteArray()
-    var items: MutableList<GitTreeLeaf> = mutableListOf()
+    lateinit var items: MutableList<GitTreeLeaf>
 
     override fun serialize(): ByteArray {
         return treeSerialize(this)
@@ -311,7 +311,7 @@ class GitTag(data: ByteArray? = null) : GitObject(data) {
     }
 
     override val fmt = "tag".toByteArray()
-    var kvlm: MutableMap<String?, MutableList<ByteArray>> = mutableMapOf()
+    lateinit var kvlm: MutableMap<String?, MutableList<ByteArray>>
 
     override fun serialize(): ByteArray {
         return kvlmSerialize(kvlm)
