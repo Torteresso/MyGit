@@ -150,7 +150,8 @@ fun repoCreate(path: Path): GitRepository {
 }
 
 fun repoFind(path: Path = Paths.get(System.getProperty("user.dir")), required: Boolean = true): GitRepository? {
-    val path = path.toRealPath()
+
+    val path = path.relativize(path).toRealPath()
 
     if (path.resolve(".git").isDirectory()) {
         return GitRepository(path)
@@ -430,10 +431,11 @@ fun kvlmParse(
         .replace("\n ", "\n")
         .toByteArray(Charsets.US_ASCII)
 
-    if (key.toString() in dct) {
-        dct[key.toString()]!!.add(value)
+    val a = key.decodeToString()
+    if (key.decodeToString() in dct) {
+        dct[key.decodeToString()]!!.add(value)
     } else {
-        dct[key.toString()] = mutableListOf(value)
+        dct[key.decodeToString()] = mutableListOf(value)
     }
 
     return kvlmParse(raw, start = end + 1, dct = dct)
@@ -571,7 +573,7 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
 
         if ((recursive != null && recursive) || (typeName == "tree")) {
             println(
-                "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $type ${item.sha}\t${
+                "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $type ${item.sha}    ${
                     Paths.get(
                         prefix
                     ).resolve(item.path)
@@ -891,7 +893,7 @@ fun gitignoreRead(repo: GitRepository): GitIgnore {
 
     for (entry in index.entries) {
         if (entry.name == ".gitignore" || entry.name.endsWith("/.gitignore")) {
-            val dirName = entry.name.substringBeforeLast('/')
+            val dirName = entry.name.substringBeforeLast('/', missingDelimiterValue = "")
             val contents = objectRead(repo, entry.sha)
             val lines = (contents as GitBlob).blobData.decodeToString().lines()
             scoped[dirName] = gitignoreParse(lines)
@@ -916,7 +918,7 @@ fun checkIgnoreScoped(
     rules: Map<String, MutableList<Pair<String, Boolean>?>>,
     path: String
 ): Boolean? {
-    val parent = path.substringBeforeLast('/')
+    var parent = path.substringBeforeLast('/', missingDelimiterValue ="")
 
     while (true) {
         if (parent in rules) {
@@ -925,7 +927,7 @@ fun checkIgnoreScoped(
         }
         if (parent.isEmpty()) break
 
-        path.substringBeforeLast('/')
+        parent = parent.substringBeforeLast('/',  missingDelimiterValue ="")
     }
 
     return null
@@ -1000,12 +1002,12 @@ fun showStatusHeadIndex(repo: GitRepository, index: GitIndex) {
     val head = convertTreeToDict(repo, "HEAD")
     for (entry in index.entries) {
         if (entry.name in head.keys) {
-            if (head[entry.name] != entry.sha) println("  modified:\t${entry.name}")
+            if (head[entry.name] != entry.sha) println("  modified:    ${entry.name}")
             head.remove(entry.name)
-        } else println("  added:\t${entry.name}")
+        } else println("  added:    ${entry.name}")
     }
     for (entry in head.keys) {
-        println("  deleted:\t$entry")
+        println("  deleted:    $entry")
     }
 }
 
@@ -1018,13 +1020,13 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
 
     repo.worktree.walk().forEach { path ->
         if (!(path.startsWith(repo.gitdir))) {
-            allFiles.add(path.toString())
+            allFiles.add(repo.worktree.relativize(path).toString())
         }
     }
 
     for (entry in index.entries) {
         val fullPath = repo.worktree.resolve(entry.name)
-        if (!fullPath.isReadable()) println("  deleted:\t${entry.name}")
+        if (!fullPath.isReadable()) println("  deleted:    ${entry.name}")
         else {
             val cTimeNs = (entry.cTime.first * 10e9 + entry.cTime.second).toLong()
             val mTimeNs = (entry.mTime.first * 10e9 + entry.mTime.second).toLong()
@@ -1037,7 +1039,7 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
             if (cTimeNs != fileCTimeNs || mTimeNs != fileMTimeNs) {
                 val newSha = objectHash(File(fullPath.toString()), "blob".toByteArray(), null)
 
-                if (entry.sha != newSha) println("  modified:\t${entry.name}")
+                if (entry.sha != newSha) println("  modified:    ${entry.name}")
             }
         }
 
@@ -1048,7 +1050,7 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
     println("Untracked files:")
 
     for (f in allFiles) {
-        if (!checkIgnore(ignore, f)) print(" \t$f")
+        if (!checkIgnore(ignore, f)) println("    $f")
     }
 
 }
@@ -1239,13 +1241,13 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
     contents[""] = mutableListOf()
 
     for (entry in index.entries) {
-        val dirName = entry.name.substringBeforeLast("/")
+        val dirName = entry.name.substringBeforeLast("/", missingDelimiterValue = "")
 
         var key = dirName
         while (key != "") {
             if (key !in contents) contents[key] = mutableListOf()
 
-            key = key.substringBeforeLast("/")
+            key = key.substringBeforeLast("/", missingDelimiterValue = "")
         }
 
         contents.getValue(dirName).add(entry)
@@ -1265,7 +1267,7 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
                     val leafMode = "${entry.modeType}${entry.modePerms}".encodeToByteArray()
                     leaf = GitTreeLeaf(
                         mode = leafMode,
-                        path = entry.name.substringBeforeLast('/'),
+                        path = entry.name.substringBeforeLast('/', missingDelimiterValue = ""),
                         sha = entry.sha
                     )
                 }
@@ -1285,7 +1287,7 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
         }
 
         sha = objectWrite(tree, repo)
-        val parent = path.substringBeforeLast('/')
+        val parent = path.substringBeforeLast('/', missingDelimiterValue = "")
         val base = Paths.get(path).name
         contents.getValue(parent).add(Pair(base, sha))
     }
