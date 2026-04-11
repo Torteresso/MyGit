@@ -510,7 +510,7 @@ fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
 
     val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
 
-    val sha = raw.sliceArray(pathTerminatorIndex + 1..<pathTerminatorIndex + 21).decodeToString()
+    val sha = raw.sliceArray(pathTerminatorIndex + 1..<pathTerminatorIndex + 21).toHexString()
 
     return Pair(pathTerminatorIndex + 21, GitTreeLeaf(mode, path.decodeToString(), sha))
 }
@@ -572,7 +572,7 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
 
         if ((recursive != null && recursive) || (typeName == "tree")) {
             println(
-                "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $type ${item.sha}    ${
+                "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $typeName ${item.sha}    ${
                     Paths.get(
                         prefix
                     ).resolve(item.path)
@@ -1139,7 +1139,7 @@ fun rm(
         absPaths.add(absPath.toString())
     }
 
-    val kepEntries = mutableListOf<GitIndexEnTry>()
+    val keptEntries = mutableListOf<GitIndexEnTry>()
     val remove = mutableListOf<String>()
 
     for (e in index.entries) {
@@ -1148,10 +1148,10 @@ fun rm(
         if (fullPath in absPaths) {
             remove.add(fullPath)
             absPaths.remove(fullPath)
-        } else kepEntries.add(e)
+        } else keptEntries.add(e)
     }
 
-    require(absPaths.isNotEmpty() || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
+    require(absPaths.isEmpty() || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
 
     if (delete) {
         for (path in remove) {
@@ -1160,7 +1160,7 @@ fun rm(
         }
 
     }
-    index.entries = kepEntries
+    index.entries = keptEntries
     indexWrite(repo, index)
 }
 
@@ -1289,7 +1289,7 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
                     val leafMode = modeString.encodeToByteArray()
                     leaf = GitTreeLeaf(
                         mode = leafMode,
-                        path = entry.name.substringBeforeLast('/', missingDelimiterValue = ""),
+                        path = Paths.get(entry.name).name,
                         sha = entry.sha
                     )
                 }
