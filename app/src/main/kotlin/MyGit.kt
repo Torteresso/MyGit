@@ -1484,7 +1484,7 @@ class ShowRef : CliktCommand(name = "show-ref") {
 class Tag : CliktCommand(name = "tag") {
 
     val createTagObject: Boolean by option("-a", help = "Whether to create a tag object")
-        .flag(default = true)
+        .flag(default = false)
     val name: String? by argument(help = "The new tag's name").optional()
     val obj by argument("object", help = "The object the new tag will point to").default("HEAD")
 
