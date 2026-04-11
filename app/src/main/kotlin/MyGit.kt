@@ -79,7 +79,7 @@ data class GitRepository(val worktree: Path, val force: Boolean = false) {
 }
 
 fun repoPath(repo: GitRepository, vararg path: Path): Path {
-    return Paths.get(repo.gitdir.toString(), *(path.map { it.toString() }.toTypedArray()))
+    return path.fold(repo.gitdir) {acc, path -> acc.resolve(path)}
 }
 
 fun repoFile(repo: GitRepository, vararg path: Path, mkdir: Boolean = false): Path? {
