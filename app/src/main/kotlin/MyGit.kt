@@ -1421,7 +1421,7 @@ class LsTree : CliktCommand(name = "ls-tree") {
 
 
     val recursive: Boolean by option("-r", help = "Recurse into sub-trees")
-        .flag(default = true)
+        .flag(default = false)
     val tree: String by argument(help = "A tree-ish object.")
 
     override fun help(context: Context) =
@@ -1530,7 +1530,7 @@ class RevParse : CliktCommand(name = "rev-parse") {
 
 class LsFiles : CliktCommand(name = "ls-files") {
 
-    val verbose: Boolean by option("--verbose", help = "Show everything").flag(default = true)
+    val verbose: Boolean by option("--verbose", help = "Show everything").flag(default = false)
 
     override fun help(context: Context) =
         "List all the stage files"
