@@ -18,6 +18,7 @@ import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
+import kotlin.String
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
@@ -172,16 +174,13 @@ abstract class GitObject(data: ByteArray? = null) {
     abstract val fmt: ByteArray
 
     init {
-        data?.let { deserialize(it) } ?: init()
+        deserialize(data ?: ByteArray(0))
     }
 
     abstract fun serialize(): ByteArray
 
     abstract fun deserialize(data: ByteArray)
 
-    open fun init() {
-
-    }
 }
 
 fun objectRead(repo: GitRepository, sha: String): GitObject? {
@@ -210,7 +209,7 @@ fun objectRead(repo: GitRepository, sha: String): GitObject? {
     val fmt = raw.sliceArray(0..<fmtIndex)
 
     val sizeIndex = raw.sliceArray(fmtIndex..<raw.size)
-        .indexOf(0x00.toByte()) + fmtIndex
+        .indexOf(0x00) + fmtIndex
     val size = String(raw, fmtIndex + 1, sizeIndex - fmtIndex - 1, Charsets.US_ASCII).toInt()
 
     require(size == raw.size - sizeIndex - 1) { "Malformed object $sha: bad length" }
@@ -372,6 +371,7 @@ fun objectFind(
     if (fmt == null) return sha
 
     while (true) {
+        if (name == "HEAD" && sha == null) throw IOException("In mgit, you must have at least one commit to check status.")
         require(sha != null) { "Sha should not be null for reference $name." }
         val obj = objectRead(repo, sha)
         require(obj != null){"Could not read object with sha : $sha"}
@@ -410,6 +410,8 @@ fun kvlmParse(
 )
         : MutableMap<String?, MutableList<ByteArray>> {
 
+    if (raw.isEmpty()) return mutableMapOf()
+
     val spaceIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte()) + start
     val newLineIndex = raw.sliceArray(start..<raw.size).indexOf('\n'.code.toByte()) + start
 
@@ -431,7 +433,6 @@ fun kvlmParse(
         .replace("\n ", "\n")
         .toByteArray(Charsets.US_ASCII)
 
-    val a = key.decodeToString()
     if (key.decodeToString() in dct) {
         dct[key.decodeToString()]!!.add(value)
     } else {
@@ -442,7 +443,9 @@ fun kvlmParse(
 }
 
 fun kvlmSerialize(kvlm: MutableMap<String?, MutableList<ByteArray>>): ByteArray {
+
     var ret = ByteArray(0)
+    if (kvlm.keys.isEmpty()) return ret
 
     for (k in kvlm.keys) {
         if (k == null) continue
@@ -509,9 +512,7 @@ fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
 
     val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
 
-    val rawSha = ByteBuffer.wrap(raw, pathTerminatorIndex + 1, pathTerminatorIndex + 21).int
-
-    val sha = rawSha.toUInt().toString(radix = 16)
+    val sha = raw.sliceArray(pathTerminatorIndex + 1..<pathTerminatorIndex + 21).decodeToString()
 
     return Pair(pathTerminatorIndex + 21, GitTreeLeaf(mode, path.decodeToString(), sha))
 }
@@ -560,7 +561,7 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
     for (item in obj.items) {
         val type =
             if (item.mode.size == 5) item.mode.sliceArray(0..<1)
-            else item.mode.sliceArray(0..<2)
+           else item.mode.sliceArray(0..<2)
 
         val typeName = when (type.decodeToString()) {
             "04" -> "tree"
@@ -768,28 +769,28 @@ fun indexRead(repo: GitRepository): GitIndex {
     val header = raw.sliceArray(0..<12)
     val signature = header.sliceArray(0..<4)
     require(signature.contentEquals("DIRC".toByteArray())) { "The signature is not DIRC." }
-    val version = ByteBuffer.wrap(header, 0, 4).int
+    val version = ByteBuffer.wrap(header, 4, 4).int
     require(version == 2) { "mgit only supports index file version 2" }
-    val count = ByteBuffer.wrap(header, 8, 12).int
+    val count = ByteBuffer.wrap(header, 8, 4).int
 
     val entries = mutableListOf<GitIndexEnTry>()
 
     val content = raw.sliceArray(12..<raw.size)
     var idx = 0
     repeat(count) {
-        val cTimeS = ByteBuffer.wrap(content, idx, idx + 4).int
-        val cTimeNs = ByteBuffer.wrap(content, idx + 4, idx + 8).int
-        val mTimeS = ByteBuffer.wrap(content, idx + 8, idx + 12).int
-        val mTimeNs = ByteBuffer.wrap(content, idx + 12, idx + 16).int
-        val dev = ByteBuffer.wrap(content, idx + 16, idx + 20).int
-        val ino = ByteBuffer.wrap(content, idx + 20, idx + 24).int
-        val unused = ByteBuffer.wrap(content, idx + 24, idx + 26).int
-        val mode = ByteBuffer.wrap(content, idx + 26, idx + 28).int
-        val uid = ByteBuffer.wrap(content, idx + 28, idx + 32).int
-        val gid = ByteBuffer.wrap(content, idx + 32, idx + 36).int
-        val sha = ByteBuffer.wrap(content, idx + 36, idx + 40).int.toHexString()
-        val fSize = ByteBuffer.wrap(content, idx + 40, idx + 60).int
-        val flags = ByteBuffer.wrap(content, idx + 60, idx + 62).int
+        val cTimeS = ByteBuffer.wrap(content, idx, 4).int
+        val cTimeNs = ByteBuffer.wrap(content, idx + 4, 4).int
+        val mTimeS = ByteBuffer.wrap(content, idx + 8, 4).int
+        val mTimeNs = ByteBuffer.wrap(content, idx + 12, 4).int
+        val dev = ByteBuffer.wrap(content, idx + 16, 4).int
+        val ino = ByteBuffer.wrap(content, idx + 20, 4).int
+        val unused = ByteBuffer.wrap(content, idx + 24, 2).short.toInt().and(0xFFFF)
+        val mode = ByteBuffer.wrap(content, idx + 26, 2).short.toInt().and(0xFFFF)
+        val uid = ByteBuffer.wrap(content, idx + 28, 4).int
+        val gid = ByteBuffer.wrap(content, idx + 32, 4).int
+        val fSize = ByteBuffer.wrap(content, idx + 36, 4).int
+        val sha = content.sliceArray(40..<60).toHexString()
+        val flags = ByteBuffer.wrap(content, idx + 60, 2).short.toInt().and(0xFFFF)
 
         require(unused == 0) { "Unused variable should be 0" }
         val modeType = mode.shr(12)
@@ -844,12 +845,11 @@ fun indexRead(repo: GitRepository): GitIndex {
 
 fun gitignoreParsel(raw: String): Pair<String, Boolean>? {
     val raw = raw.trim()
-    val firstChar = raw.elementAt(0)
-    return if (raw.isEmpty() || firstChar == '#') {
+    return if (raw.isEmpty() || raw.elementAt(0) == '#') {
         null
-    } else if (firstChar == '!') {
+    } else if (raw.elementAt(0) == '!') {
         Pair(raw.substring(1..<raw.length), false)
-    } else if (firstChar == '\\') {
+    } else if (raw.elementAt(0) == '\\') {
         Pair(raw.substring(1..<raw.length), true)
     } else {
         Pair(raw, true)
@@ -1034,7 +1034,7 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
             val fileCTimeNs =
                 (Files.getAttribute(fullPath, "unix:ctime") as FileTime).to(TimeUnit.NANOSECONDS)
             val fileMTimeNs =
-                (Files.getAttribute(fullPath, "unix:mtime") as FileTime).to(TimeUnit.NANOSECONDS)
+                (Files.getAttribute(fullPath, "unix:lastModifiedTime") as FileTime).to(TimeUnit.NANOSECONDS)
 
             if (cTimeNs != fileCTimeNs || mTimeNs != fileMTimeNs) {
                 val newSha = objectHash(File(fullPath.toString()), "blob".toByteArray(), null)
@@ -1055,49 +1055,71 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
 
 }
 
-fun Int.toNBytes(n: Int): ByteArray {
-    return ByteBuffer.allocate(n).putInt(this).array()
+fun Int.to4Bytes(): ByteArray {
+    return ByteBuffer.allocate(4).putInt(this).array()
+}
+
+fun Int.to2Bytes(): ByteArray {
+    require(this in 0..0xFFFF) { "Value $this does not fit in 2 bytes unsigned" }
+    return ByteBuffer.allocate(2).putShort(this.toShort()).array()
+}
+
+fun shaToBytes(sha: String): ByteArray {
+    val bigInt = BigInteger(sha, 16)
+    val bytes = bigInt.toByteArray()
+
+    return when (bytes.size) {
+        20 -> {
+            bytes
+        }
+        21 if bytes[0] == 0.toByte() -> {
+            bytes.sliceArray(1..21)
+        }
+        else -> {
+            ByteArray(20 - bytes.size) { 0 } + bytes
+        }
+    }
 }
 
 fun indexWrite(repo: GitRepository, index: GitIndex) {
     val indexPath =
-        repoFile(repo, Paths.get("index")) ?: throw IOException("Could not find index file.")
+        repoFile(repo, Paths.get("index")) ?: throw IOException("Could not find/create index file.")
 
     val f = File(indexPath.toString())
 
     f.writeBytes("DIRC".toByteArray())
-    f.appendBytes(index.version.toNBytes(4))
-    f.appendBytes(index.entries.size.toNBytes(4))
+    f.appendBytes(index.version.to4Bytes())
+    f.appendBytes(index.entries.size.to4Bytes())
 
     var idx = 0
 
     for (e in index.entries) {
-        f.appendBytes(e.cTime.first.toNBytes(4))
-        f.appendBytes(e.cTime.second.toNBytes(4))
-        f.appendBytes(e.mTime.first.toNBytes(4))
-        f.appendBytes(e.mTime.second.toNBytes(4))
-        f.appendBytes(e.dev.toNBytes(4))
-        f.appendBytes(e.ino.toNBytes(4))
+        f.appendBytes(e.cTime.first.to4Bytes())
+        f.appendBytes(e.cTime.second.to4Bytes())
+        f.appendBytes(e.mTime.first.to4Bytes())
+        f.appendBytes(e.mTime.second.to4Bytes())
+        f.appendBytes(e.dev.to4Bytes())
+        f.appendBytes(e.ino.to4Bytes())
 
         val mode = e.modeType.shl(12).or(e.modePerms)
-        f.appendBytes(mode.toNBytes(4))
-        f.appendBytes(e.uid.toNBytes(4))
-        f.appendBytes(e.gid.toNBytes(4))
-        f.appendBytes(e.fSize.toNBytes(4))
-        f.appendBytes(e.sha.toInt(16).toNBytes(4))
+        f.appendBytes(mode.to4Bytes())
+        f.appendBytes(e.uid.to4Bytes())
+        f.appendBytes(e.gid.to4Bytes())
+        f.appendBytes(e.fSize.to4Bytes())
+        f.appendBytes(shaToBytes(e.sha))
         val flagAssumeValid = if (e.flagAssumeValid) 0x1.shl(15) else 0
         val nameBytes = e.name.encodeToByteArray()
         val nameLength = if (nameBytes.size >= 0xFFF) 0xFFF else nameBytes.size
 
-        f.appendBytes((flagAssumeValid.or(e.flagStage).or(nameLength)).toNBytes(4))
+        f.appendBytes((flagAssumeValid.or(e.flagStage).or(nameLength)).to2Bytes())
         f.appendBytes(nameBytes)
-        f.appendBytes(0x00.toNBytes(1))
+        f.appendBytes(byteArrayOf(0))
 
         idx += 62 + nameBytes.size + 1
 
         if (idx % 8 != 0) {
             val pad = 8 - (idx % 8)
-            f.appendBytes(0x00.toNBytes(pad))
+            f.appendBytes(ByteArray(pad))
             idx += pad
         }
     }
@@ -1155,7 +1177,7 @@ fun add(
         val absPath = Paths.get(path).absolute()
         require(absPath.startsWith(repo.worktree) && absPath.isReadable()) { "Not a file, or outside the worktree: $paths" }
 
-        val relPath = absPath.relativize(repo.worktree)
+        val relPath = repo.worktree.relativize(absPath)
         cleanPaths.add(Pair(absPath.toString(), relPath.toString()))
     }
 
@@ -1172,10 +1194,10 @@ fun add(
             "unix:ctime"
         ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
         val mTimeS =
-            (Files.getAttribute(Paths.get(absPath), "unix:mtime") as FileTime).to(TimeUnit.SECONDS)
+            (Files.getAttribute(Paths.get(absPath), "unix:lastModifiedTime") as FileTime).to(TimeUnit.SECONDS)
         val mTimeNs = (Files.getAttribute(
             Paths.get(absPath),
-            "unix:mtime"
+            "unix:lastModifiedTime"
         ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
 
         val dev = (Files.getAttribute(Paths.get(absPath), "unix:dev") as Long).toInt()
@@ -1224,7 +1246,7 @@ fun gitConfigRead(): INIConfiguration? {
         }
     }
 
-    return if (config.isEmpty()) null else config
+    return if (config.isEmpty) null else config
 }
 
 fun getUserGitConfig(config: INIConfiguration?): String? {
@@ -1264,7 +1286,9 @@ fun treeFromIndex(repo: GitRepository, index: GitIndex): String? {
         for (entry in contents.getValue(path)) {
             when (entry) {
                 is GitIndexEnTry -> {
-                    val leafMode = "${entry.modeType}${entry.modePerms}".encodeToByteArray()
+                    val modeString = entry.modeType.toString(8).padStart(2, '0') +
+                            entry.modePerms.toString(8).padStart(4, '0')
+                    val leafMode = modeString.encodeToByteArray()
                     leaf = GitTreeLeaf(
                         mode = leafMode,
                         path = entry.name.substringBeforeLast('/', missingDelimiterValue = ""),
@@ -1672,6 +1696,7 @@ fun main(args: Array<String>) = try {
         .subcommands(CheckIgnore())
         .subcommands(Status())
         .subcommands(Remove())
+        .subcommands(Add())
         .subcommands(Commit())
         .main(args)
 } catch (e: IOException) {
