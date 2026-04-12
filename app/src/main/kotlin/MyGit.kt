@@ -18,7 +18,6 @@ import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
-import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,6 +34,7 @@ import kotlin.String
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -206,8 +206,8 @@ fun objectRead(repo: GitRepository, sha: String): GitObject? {
     val fmtIndex = raw.indexOf(' '.code.toByte())
     val fmt = raw.sliceArray(0..<fmtIndex)
 
-    val sizeIndex = raw.sliceArray(fmtIndex..<raw.size)
-        .indexOf(0x00) + fmtIndex
+    val sizeIndex = raw
+        .indexOf(0x00, fmtIndex)
     val size = String(raw, fmtIndex + 1, sizeIndex - fmtIndex - 1, Charsets.US_ASCII).toInt()
 
     require(size == raw.size - sizeIndex - 1) { "Malformed object $sha: bad length" }
@@ -402,6 +402,13 @@ fun objectHash(fd: File, fmt: ByteArray, repo: GitRepository? = null): String {
     return objectWrite(gitObject, repo)
 }
 
+fun ByteArray.indexOf(byte: Byte, startIndex: Int): Int {
+    for (i in startIndex until size) {
+        if (this[i] == byte) return i
+    }
+    return -1
+}
+
 fun kvlmParse(
     raw: ByteArray, start: Int = 0,
     dct: MutableMap<String?, MutableList<ByteArray>> = mutableMapOf()
@@ -410,8 +417,8 @@ fun kvlmParse(
 
     if (raw.isEmpty()) return mutableMapOf()
 
-    val spaceIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte()) + start
-    val newLineIndex = raw.sliceArray(start..<raw.size).indexOf('\n'.code.toByte()) + start
+    val spaceIndex = raw.indexOf(' '.code.toByte(), start)
+    val newLineIndex = raw.indexOf('\n'.code.toByte(), start)
 
     if (spaceIndex !in 0..newLineIndex) {
         require(newLineIndex == start) { "Malformed commit : $raw" }
@@ -423,7 +430,7 @@ fun kvlmParse(
     var end = start
 
     while (true) {
-        end = raw.sliceArray((end + 1)..<raw.size).indexOf('\n'.code.toByte()) + (end + 1)
+        end = raw.indexOf('\n'.code.toByte(), end + 1)
         if (raw.elementAt(end + 1) != ' '.code.toByte()) break
     }
 
@@ -497,7 +504,7 @@ fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
 data class GitTreeLeaf(val mode: ByteArray, val path: String, val sha: String)
 
 fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
-    val modeTerminatorIndex = raw.sliceArray(start..<raw.size).indexOf(' '.code.toByte()) + start
+    val modeTerminatorIndex = raw.indexOf(' '.code.toByte(), start)
 
     require(modeTerminatorIndex - start == 5 || modeTerminatorIndex - start == 6)
     { "Wrong position for mode terminator of the tree $raw" }
@@ -505,8 +512,8 @@ fun treeParseOne(raw: ByteArray, start: Int = 0): Pair<Int, GitTreeLeaf> {
     var mode = raw.sliceArray(start..<modeTerminatorIndex)
     if (mode.size == 5) mode = "0".toByteArray() + mode
 
-    val pathTerminatorIndex = raw.sliceArray(modeTerminatorIndex..<raw.size)
-        .indexOf(0x00.toByte()) + modeTerminatorIndex
+    val pathTerminatorIndex = raw
+        .indexOf(0x00.toByte(), modeTerminatorIndex)
 
     val path = raw.sliceArray(modeTerminatorIndex + 1..<pathTerminatorIndex)
 
@@ -543,7 +550,7 @@ fun treeSerialize(obj: GitTree): ByteArray {
         ret += leaf.mode
         ret += ' '.code.toByte()
         ret += leaf.path.encodeToByteArray()
-        ret += 0x00.toByte()
+        ret += byteArrayOf(0)
         ret += leaf.sha.hexToByteArray()
     }
 
@@ -570,7 +577,7 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
             else -> throw IllegalArgumentException("Weird tree leaf mode : ${item.mode}")
         }
 
-        if ((recursive != null && recursive) || (typeName == "tree")) {
+        if (recursive == null || !recursive || (typeName != "tree")) {
             println(
                 "${"0".repeat(6 - item.mode.size) + item.mode.decodeToString()} $typeName ${item.sha}    ${
                     Paths.get(
@@ -787,7 +794,7 @@ fun indexRead(repo: GitRepository): GitIndex {
         val uid = ByteBuffer.wrap(content, idx + 28, 4).int
         val gid = ByteBuffer.wrap(content, idx + 32, 4).int
         val fSize = ByteBuffer.wrap(content, idx + 36, 4).int
-        val sha = content.sliceArray(40..<60).toHexString()
+        val sha = content.sliceArray(idx+40..<idx+60).toHexString()
         val flags = ByteBuffer.wrap(content, idx + 60, 2).short.toInt().and(0xFFFF)
 
         require(unused == 0) { "Unused variable should be 0" }
@@ -810,7 +817,7 @@ fun indexRead(repo: GitRepository): GitIndex {
         } else {
             println("Notice: Name is 0x$nameLength bytes long.")
             //        /!\ PROBABLY BROKEN /!\
-            val nullIdx = content.sliceArray(idx + 0xFFF..<content.size).indexOf(0x00.toByte()) + idx + 0xFFF
+            val nullIdx = content.indexOf(0x00.toByte(), idx + 0xFFF)
             rawName = content.sliceArray(idx..<nullIdx)
             idx = nullIdx + 1
         }
@@ -1026,8 +1033,8 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
         val fullPath = repo.worktree.resolve(entry.name)
         if (!fullPath.isReadable()) println("  deleted:    ${entry.name}")
         else {
-            val cTimeNs = (entry.cTime.first * 10e9 + entry.cTime.second).toLong()
-            val mTimeNs = (entry.mTime.first * 10e9 + entry.mTime.second).toLong()
+            val cTimeNs = (entry.cTime.first * 1_000_000_000L + entry.cTime.second)
+            val mTimeNs = (entry.mTime.first * 1_000_000_000L + entry.mTime.second)
 
             val fileCTimeNs =
                 (Files.getAttribute(fullPath, "unix:ctime") as FileTime).to(TimeUnit.NANOSECONDS)
@@ -1062,23 +1069,6 @@ fun Int.to2Bytes(): ByteArray {
     return ByteBuffer.allocate(2).putShort(this.toShort()).array()
 }
 
-fun shaToBytes(sha: String): ByteArray {
-    val bigInt = BigInteger(sha, 16)
-    val bytes = bigInt.toByteArray()
-
-    return when (bytes.size) {
-        20 -> {
-            bytes
-        }
-        21 if bytes[0] == 0.toByte() -> {
-            bytes.sliceArray(1..21)
-        }
-        else -> {
-            ByteArray(20 - bytes.size) { 0 } + bytes
-        }
-    }
-}
-
 fun indexWrite(repo: GitRepository, index: GitIndex) {
     val indexPath =
         repoFile(repo, Paths.get("index")) ?: throw IOException("Could not find/create index file.")
@@ -1104,7 +1094,7 @@ fun indexWrite(repo: GitRepository, index: GitIndex) {
         f.appendBytes(e.uid.to4Bytes())
         f.appendBytes(e.gid.to4Bytes())
         f.appendBytes(e.fSize.to4Bytes())
-        f.appendBytes(shaToBytes(e.sha))
+        f.appendBytes(e.sha.hexToByteArray())
         val flagAssumeValid = if (e.flagAssumeValid) 0x1.shl(15) else 0
         val nameBytes = e.name.encodeToByteArray()
         val nameLength = if (nameBytes.size >= 0xFFF) 0xFFF else nameBytes.size
@@ -1151,15 +1141,28 @@ fun rm(
         } else keptEntries.add(e)
     }
 
-    require(absPaths.isEmpty() || !skipMissing) { "Cannot remove paths not in the index: $absPaths" }
+    require(absPaths.isEmpty() || skipMissing) { "Cannot remove paths not in the index: $absPaths" }
 
     if (delete) {
         for (path in remove) {
-            throw IOException("FIRST TEST IN DEBUG TO PREVENT UNLUCKY SURPRISES (was going to remove: $path)")
-            //Paths.get(path).deleteIfExists()
+            print("Are you sure you want to delete $path ? (y/n)  ")
+            while(true) {
+                val userResponse = readln()
+                    if (userResponse == "y") {
+                        Paths.get(path).deleteIfExists()
+                        break
+                    }
+                    else if (userResponse == "n")
+                    {
+                        println("Cancelled removal of all items in $remove")
+                        return
+                    }
+                    else print("Type 'y' for yes and 'n' for no.  ")
+                }
+            }
         }
 
-    }
+
     index.entries = keptEntries
     indexWrite(repo, index)
 }
@@ -1190,13 +1193,13 @@ fun add(
         val cTimeNs = (Files.getAttribute(
             Paths.get(absPath),
             "unix:ctime"
-        ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
+        ) as FileTime).to(TimeUnit.NANOSECONDS) % 1_000_000_000L
         val mTimeS =
             (Files.getAttribute(Paths.get(absPath), "unix:lastModifiedTime") as FileTime).to(TimeUnit.SECONDS)
         val mTimeNs = (Files.getAttribute(
             Paths.get(absPath),
             "unix:lastModifiedTime"
-        ) as FileTime).to(TimeUnit.NANOSECONDS) % 10e9
+        ) as FileTime).to(TimeUnit.NANOSECONDS) % 1_000_000_000L
 
         val dev = (Files.getAttribute(Paths.get(absPath), "unix:dev") as Long).toInt()
         val ino = (Files.getAttribute(Paths.get(absPath), "unix:ino") as Long).toInt()
