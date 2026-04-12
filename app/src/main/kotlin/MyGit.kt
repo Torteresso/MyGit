@@ -489,7 +489,7 @@ fun logGraphviz(repo: GitRepository, sha: String, seen: MutableSet<String>) {
 
     for (p in parents) {
         val pDecoded = p.toString(Charsets.US_ASCII)
-        println("  c_$sha -> c_$p;")
+        println("  c_$sha -> c_$pDecoded;")
         logGraphviz(repo, pDecoded, seen)
     }
 }
