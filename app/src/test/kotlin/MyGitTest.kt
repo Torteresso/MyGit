@@ -38,6 +38,10 @@ class MyGitTest {
     private val outContent = ByteArrayOutputStream()
     private val originalOut = System.out
 
+    companion object {
+        private val SHA_LENGHT = 40
+    }
+
     @BeforeEach
     fun changeOutPutStream() {
         System.setOut(PrintStream(outContent))
@@ -143,6 +147,204 @@ class MyGitTest {
         CatFile().test("blob 484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81")
 
         assertEquals("This is a test.\n", outContent.toString())
+    }
+
+    @Test
+    fun logCommand_WithNoCommitYet_WarnUser() {
+        Init().test(workingDirectory.toString())
+        Log().test()
+
+        assertEquals("Your current branch does not have any commit yet.\n", outContent.toString())
+    }
+
+    @Test
+    fun commitCommand_InEmptyGitDir_CreateCommitAndEmptyTreeObject() {
+        Init().test(workingDirectory.toString())
+
+        Commit().test("-m \"Initial commit\"")
+
+        assertTrue(workingDirectory.resolve(".git/refs/heads/master").isReadable())
+
+        val treeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        val commitSha =
+            workingDirectory.resolve(".git/refs/heads/master").readText().removeSuffix("\n")
+
+        assertEquals(SHA_LENGHT, commitSha.length)
+
+        CatFile().test("commit $commitSha")
+
+        val commitLines = outContent.toString().lines()
+
+        assertEquals("tree $treeSha", commitLines[0])
+        assertTrue(commitLines[1].contains("author"))
+        assertTrue(commitLines[2].contains("committer"))
+        assertEquals("Initial commit", commitLines[4])
+
+        outContent.reset()
+        CatFile().test("tree $treeSha")
+        assertEquals("", outContent.toString())
+    }
+
+    @Test
+    fun addCommand_ForOneFile_AddTheFileToGitDir() {
+        val testFile = writeSomeTestsFilesInGitRepo()
+
+        Commit().test("-m \"Initial commit\"")
+        Add().test(testFile.toString())
+
+        HashObject().test(testFile.toString())
+
+        val fileSha = outContent.toString().removeSuffix("\n")
+
+        assertEquals(SHA_LENGHT, fileSha.length)
+
+        val fileShaDir = fileSha.substring(0..<2)
+        val fileShaFile = fileSha.substring(2..<fileSha.length)
+
+        assertTrue(workingDirectory.resolve(".git/objects/$fileShaDir/$fileShaFile").isReadable())
+    }
+
+    fun checkStatus(toBeCommited: String, notStaged: String, untracked: String) {
+        Status().test()
+        val statusLines = outContent.toString().split("\n\n")
+
+        assertEquals(
+            "On branch master.\n" +
+                    "Changes to be committed:" + toBeCommited, statusLines[0]
+        )
+        assertEquals("Changes not staged for commit:$notStaged", statusLines[1])
+        assertEquals(
+            "Untracked files:$untracked\n", statusLines[2]
+        )
+
+        outContent.reset()
+    }
+
+    @Test
+    fun allCommands_ForTypicalUserFlow_ShouldNotThrow() {
+        Init().test(workingDirectory.toString())
+        Commit().test("-m \"Initial commit\"")
+
+        val testFile = workingDirectory.resolve("test.txt")
+        testFile.writeText("This is a test.\n")
+        val gitignoreFile = workingDirectory.resolve(".gitignore")
+        gitignoreFile.writeText("fileToIgnore.txt")
+        val fileToIgnore = workingDirectory.resolve("fileToIgnore.txt")
+        fileToIgnore.writeText("I don't want this file to be in my git repo.")
+
+        checkStatus(
+            "", "", "\n    fileToIgnore.txt\n" +
+                    "    .gitignore\n" +
+                    "    test.txt"
+        )
+
+        Add().test("$gitignoreFile $testFile")
+
+        checkStatus("\n  added:    .gitignore\n" +
+                "  added:    test.txt", "", "")
+
+        Commit().test("-m \"Add my files.\"")
+
+        Tag().test()
+        assertEquals("", outContent.toString())
+        Tag().test("v1")
+        Tag().test("-a v1Bis")
+        Tag().test()
+        assertEquals("v1\nv1Bis\n", outContent.toString())
+        outContent.reset()
+
+        ShowRef().test()
+        val showRefLines = outContent.toString().lines()
+        val masterSha = showRefLines[0].split(" ").first()
+        val masterPath = showRefLines[0].split(" ")[1]
+        val v1Ref = showRefLines[1].split(" ").first()
+        val v1Path = showRefLines[1].split(" ")[1]
+        val v1BisRef = showRefLines[2].split(" ").first()
+        val v1BisPath = showRefLines[2].split(" ")[1]
+
+       assertEquals("refs/heads/master", masterPath)
+        assertEquals("refs/tags/v1", v1Path)
+        assertEquals("refs/tags/v1Bis", v1BisPath)
+        assertEquals(masterSha, v1Ref)
+        assertTrue(v1Ref != v1BisRef)
+        outContent.reset()
+
+        CheckIgnore().test("${testFile.name} ${fileToIgnore.name} ${gitignoreFile.name}")
+        assertEquals("fileToIgnore.txt\n", outContent.toString())
+        outContent.reset()
+
+        RevParse().test("--mgit-type commit HEAD")
+        assertEquals(masterSha + "\n", outContent.toString())
+        outContent.reset()
+
+        testFile.appendText("Let's add some text to this file.")
+
+        checkStatus("", "\n  modified:    test.txt", "")
+
+        Add().test(testFile.toString())
+        Commit().test("-m \"Append some text to test.txt\"")
+
+        Log().test()
+        assertTrue(outContent.toString().contains("Add my files"))
+        outContent.reset()
+
+        LsTree().test("-r HEAD")
+        val lsTreeLines = outContent.toString().lines()
+        val gitIgnoreLineInfos = lsTreeLines[0].split(" ")
+        val testFileLineInfos = lsTreeLines[1].split(" ")
+
+        assertEquals(".gitignore", gitIgnoreLineInfos.last())
+        assertEquals("test.txt", testFileLineInfos.last())
+        assertEquals("100644", gitIgnoreLineInfos[0])
+        assertEquals("100644", testFileLineInfos[0])
+        assertEquals("blob", gitIgnoreLineInfos[1])
+        assertEquals("blob", testFileLineInfos[1])
+
+        val testFileSha = testFileLineInfos[2]
+        outContent.reset()
+
+        CatFile().test("blob $testFileSha")
+        assertEquals("This is a test.\nLet's add some text to this file.", outContent.toString())
+
+        LsFiles().test()
+        assertTrue(outContent.toString().contains(".gitignore"))
+        assertTrue(outContent.toString().contains("test.txt"))
+        assertTrue(!outContent.toString().contains("fileToIgnore.txt"))
+        outContent.reset()
+
+
+        assertTrue(workingDirectory.resolve("test.txt").exists())
+        val originalIn: InputStream = System.`in`
+        try {
+            val yesResponse = ByteArrayInputStream("y".toByteArray())
+            System.setIn(yesResponse)
+            Remove().test(testFile.toString())
+        }
+        finally {
+            outContent.reset()
+            System.setIn(originalIn)
+        }
+
+        assertTrue(!workingDirectory.resolve("test.txt").exists())
+
+        checkStatus("\n  deleted:    test.txt", "", "")
+
+        Commit().test("-m \"Deleted the test file\"")
+
+        checkStatus("", "", "")
+
+        val backUpDir = workingDirectory.resolve("BackUpDir")
+
+        backUpDir.createDirectory()
+        assertTrue(backUpDir.exists())
+
+        Checkout().test("v1 $backUpDir")
+
+        val testFileBackUp = workingDirectory.resolve("BackUpDir/test.txt")
+        assertTrue(testFileBackUp.exists())
+        assertTrue(workingDirectory.resolve("BackUpDir/.gitignore").exists())
+
+        assertEquals("This is a test.\n", testFileBackUp.readText())
     }
 
 }
