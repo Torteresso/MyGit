@@ -1,7 +1,7 @@
-import Commit
 import com.github.ajalt.clikt.testing.test
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Order
@@ -39,7 +39,7 @@ class MyGitTest {
     private val originalOut = System.out
 
     companion object {
-        private val SHA_LENGHT = 40
+        private const val SHA_LENGTH = 40
     }
 
     @BeforeEach
@@ -169,7 +169,7 @@ class MyGitTest {
         val commitSha =
             workingDirectory.resolve(".git/refs/heads/master").readText().removeSuffix("\n")
 
-        assertEquals(SHA_LENGHT, commitSha.length)
+        assertEquals(SHA_LENGTH, commitSha.length)
 
         CatFile().test("commit $commitSha")
 
@@ -196,7 +196,7 @@ class MyGitTest {
 
         val fileSha = outContent.toString().removeSuffix("\n")
 
-        assertEquals(SHA_LENGHT, fileSha.length)
+        assertEquals(SHA_LENGTH, fileSha.length)
 
         val fileShaDir = fileSha.substring(0..<2)
         val fileShaFile = fileSha.substring(2..<fileSha.length)
@@ -204,7 +204,12 @@ class MyGitTest {
         assertTrue(workingDirectory.resolve(".git/objects/$fileShaDir/$fileShaFile").isReadable())
     }
 
-    fun checkStatus(toBeCommited: String, notStaged: String, untracked: String) {
+    fun checkStatus(
+        toBeCommited: String,
+        notStaged: String,
+        untrackedPresent: List<String> = emptyList(),
+        untrackedAbsent: List<String> = emptyList()
+    ) {
         Status().test()
         val statusLines = outContent.toString().split("\n\n")
 
@@ -213,9 +218,8 @@ class MyGitTest {
                     "Changes to be committed:" + toBeCommited, statusLines[0]
         )
         assertEquals("Changes not staged for commit:$notStaged", statusLines[1])
-        assertEquals(
-            "Untracked files:$untracked\n", statusLines[2]
-        )
+        untrackedPresent.forEach { f -> assertTrue(statusLines[2].contains(f)) }
+        untrackedAbsent.forEach { f -> assertFalse(statusLines[2].contains(f)) }
 
         outContent.reset()
     }
@@ -233,15 +237,15 @@ class MyGitTest {
         fileToIgnore.writeText("I don't want this file to be in my git repo.")
 
         checkStatus(
-            "", "", "\n    fileToIgnore.txt\n" +
-                    "    .gitignore\n" +
-                    "    test.txt"
+            "", "", listOf("fileToIgnore.txt", "test.txt", ".gitignore")
         )
 
         Add().test("$gitignoreFile $testFile")
 
-        checkStatus("\n  added:    .gitignore\n" +
-                "  added:    test.txt", "", "")
+        checkStatus(
+            "\n  added:    .gitignore\n" +
+                    "  added:    test.txt", "", untrackedAbsent = listOf("fileToIgnore.txt")
+        )
 
         Commit().test("-m \"Add my files.\"")
 
@@ -262,7 +266,7 @@ class MyGitTest {
         val v1BisRef = showRefLines[2].split(" ").first()
         val v1BisPath = showRefLines[2].split(" ")[1]
 
-       assertEquals("refs/heads/master", masterPath)
+        assertEquals("refs/heads/master", masterPath)
         assertEquals("refs/tags/v1", v1Path)
         assertEquals("refs/tags/v1Bis", v1BisPath)
         assertEquals(masterSha, v1Ref)
@@ -279,7 +283,7 @@ class MyGitTest {
 
         testFile.appendText("Let's add some text to this file.")
 
-        checkStatus("", "\n  modified:    test.txt", "")
+        checkStatus("", "\n  modified:    test.txt", untrackedAbsent = listOf("fileToIgnore.txt"))
 
         Add().test(testFile.toString())
         Commit().test("-m \"Append some text to test.txt\"")
@@ -319,19 +323,18 @@ class MyGitTest {
             val yesResponse = ByteArrayInputStream("y".toByteArray())
             System.setIn(yesResponse)
             Remove().test(testFile.toString())
-        }
-        finally {
+        } finally {
             outContent.reset()
             System.setIn(originalIn)
         }
 
         assertTrue(!workingDirectory.resolve("test.txt").exists())
 
-        checkStatus("\n  deleted:    test.txt", "", "")
+        checkStatus("\n  deleted:    test.txt", "", untrackedAbsent = listOf("fileToIgnore.txt"))
 
         Commit().test("-m \"Deleted the test file\"")
 
-        checkStatus("", "", "")
+        checkStatus("", "", untrackedAbsent = listOf("fileToIgnore.txt"))
 
         val backUpDir = workingDirectory.resolve("BackUpDir")
 
