@@ -1411,10 +1411,16 @@ class Log : CliktCommand(name = "log") {
 
         require(repo != null) { "No git repository was found." }
 
+        val sha = objectFind(repo, commit)
+        if (commit == "HEAD" && sha == null)
+        {
+            println("Your current branch does not have any commit yet.")
+            return
+        }
+        require(sha != null) { "Could not find sha associated with name $commit" }
+
         println("digraph myGitLog{")
         println("   node[shape=rect]")
-        val sha = objectFind(repo, commit)
-        require(sha != null) { "Could not find sha associated with name $commit" }
         logGraphviz(repo, sha, mutableSetOf())
         println("}")
     }
