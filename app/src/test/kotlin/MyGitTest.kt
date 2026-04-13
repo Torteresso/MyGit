@@ -1,3 +1,4 @@
+import Commit
 import com.github.ajalt.clikt.testing.test
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -8,14 +9,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.PrintStream
 import java.nio.file.Path
+import kotlin.io.path.appendText
 import kotlin.io.path.createDirectory
 import kotlin.io.path.createFile
+import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 @Target(AnnotationTarget.FUNCTION)
@@ -43,23 +50,20 @@ class MyGitTest {
     }
 
     @BeforeEach
-    fun changeCurrentDir()
-    {
+    fun changeCurrentDir() {
         userDir = System.getProperty("user.dir")
         System.setProperty("user.dir", workingDirectory.toString())
     }
 
     @Order(2)
     @AfterEach
-    fun restoreCurrentDir()
-    {
+    fun restoreCurrentDir() {
         System.setProperty("user.dir", userDir)
     }
 
     @Order(1)
     @AfterEach
-    fun checkGitFolderBasicStructure(testInfo: TestInfo)
-    {
+    fun checkGitFolderBasicStructure(testInfo: TestInfo) {
         val method = testInfo.testMethod.orElse(null)
         if (method?.getAnnotation(SkipGitFolderCheck::class.java) != null) {
             return
@@ -80,9 +84,9 @@ class MyGitTest {
         val command = Init()
         val result = command.test(workingDirectory.toString())
 
-        assertEquals(result.statusCode, 0)
+        assertEquals(0, result.statusCode)
 
-        assertEquals(workingDirectory.listDirectoryEntries().size, 1)
+        assertEquals(1, workingDirectory.listDirectoryEntries().size)
 
     }
 
@@ -93,13 +97,12 @@ class MyGitTest {
         workingDirectory.resolve(".git/test.txt").createFile()
         val command = Init()
 
-        assertThrows<IllegalArgumentException> { command.test(workingDirectory.toString() )}
+        assertThrows<IllegalArgumentException> { command.test(workingDirectory.toString()) }
     }
 
     @SkipGitFolderCheck
     @Test
-    fun hashObjectCommand_ForBlobFile_PrintSha()
-    {
+    fun hashObjectCommand_ForBlobFile_PrintSha() {
         val testFile = workingDirectory.resolve("test.txt")
         testFile.writeText("This is a test.\n")
         assertTrue(testFile.isReadable())
@@ -108,31 +111,33 @@ class MyGitTest {
         assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
     }
 
-    fun writeSomeTestsFilesInGitRepo()
-    {
+    fun writeSomeTestsFilesInGitRepo(): Path {
         val testFile = workingDirectory.resolve("test.txt")
         testFile.writeText("This is a test.\n")
         assertTrue(testFile.isReadable())
 
         Init().test(workingDirectory.toString())
-        HashObject().test("-w $testFile")
+        return testFile
     }
 
     @Test
-    fun hashObjectCommand_ForBlobFileWithWrite_WriteAndPrintSha()
-    {
-       writeSomeTestsFilesInGitRepo()
+    fun hashObjectCommand_ForBlobFileWithWrite_WriteAndPrintSha() {
+        val testFile = writeSomeTestsFilesInGitRepo()
+        HashObject().test("-w $testFile")
 
 
 
         assertEquals("484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81\n", outContent.toString())
-        assertTrue(workingDirectory.resolve(".git/objects/48/4ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81").isReadable())
+        assertTrue(
+            workingDirectory.resolve(".git/objects/48/4ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81")
+                .isReadable()
+        )
     }
 
     @Test
-    fun catFileCommand_ForExistingBlobFile_PrintItsContent()
-    {
-        writeSomeTestsFilesInGitRepo()
+    fun catFileCommand_ForExistingBlobFile_PrintItsContent() {
+        val testFile = writeSomeTestsFilesInGitRepo()
+        HashObject().test("-w $testFile")
         outContent.reset()
 
         CatFile().test("blob 484ba93ef5b0aed5b72af8f4e9dc4cfd10ef1a81")
