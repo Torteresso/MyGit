@@ -9,7 +9,7 @@ And run the installHere script :
 
 ```bash
 cd someRepoToVersionControl
-bash path/to/MyGit/installHere.sh
+bash path/to/MyGit/install_here.sh
 ```
 
 This will generate a ./mgit executable in the current repository.
