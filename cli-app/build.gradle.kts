@@ -21,6 +21,9 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    //JGit
+    implementation("org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r")
 }
 
 tasks.named<Test>("test") {
