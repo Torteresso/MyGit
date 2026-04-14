@@ -1,16 +1,5 @@
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.main
-import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.default
-import com.github.ajalt.clikt.parameters.arguments.multiple
-import com.github.ajalt.clikt.parameters.arguments.optional
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.required
-import com.github.ajalt.clikt.parameters.types.choice
+package gitLogic
+
 import org.apache.commons.configuration2.INIConfiguration
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -566,7 +555,7 @@ fun lsTree(repo: GitRepository, ref: String, recursive: Boolean?, prefix: String
     for (item in obj.items) {
         val type =
             if (item.mode.size == 5) item.mode.sliceArray(0..<1)
-           else item.mode.sliceArray(0..<2)
+            else item.mode.sliceArray(0..<2)
 
         val typeName = when (type.decodeToString()) {
             "04" -> "tree"
@@ -1148,19 +1137,19 @@ fun rm(
             print("Are you sure you want to delete $path ? (y/n)  ")
             while(true) {
                 val userResponse = readln()
-                    if (userResponse == "y") {
-                        Paths.get(path).deleteIfExists()
-                        break
-                    }
-                    else if (userResponse == "n")
-                    {
-                        println("Cancelled removal of all items in $remove")
-                        return
-                    }
-                    else print("Type 'y' for yes and 'n' for no.  ")
+                if (userResponse == "y") {
+                    Paths.get(path).deleteIfExists()
+                    break
                 }
+                else if (userResponse == "n")
+                {
+                    println("Cancelled removal of all items in $remove")
+                    return
+                }
+                else print("Type 'y' for yes and 'n' for no.  ")
             }
         }
+    }
 
 
     index.entries = keptEntries
@@ -1347,368 +1336,207 @@ fun commitCreate(
     return objectWrite(commit, repo)
 }
 
-class MGit : CliktCommand() {
-    override fun run() = Unit
+fun init(path: String) {
+    repoCreate(Paths.get(path))
 }
 
-class Init : CliktCommand(name = "init") {
-    val path: String by argument().default("./")
-    override fun help(context: Context) =
-        "Create an empty Git repository or reinitialize an existing one"
+fun catFile(type: String, objectName: String) {
 
-    override fun run() {
-        repoCreate(Paths.get(path))
+    val repo = repoFind()
+    if (repo != null) catFile(repo, objectName, type.toByteArray())
+
+}
+
+fun hashObject(type: String, write: Boolean, path: String) {
+    val repo = if (write) repoFind() else null
+    val sha = objectHash(File(path), type.toByteArray(), repo)
+
+    println(sha)
+}
+
+fun log(commit: String) {
+    val repo = repoFind()
+
+    require(repo != null) { "No git repository was found." }
+
+    val sha = objectFind(repo, commit)
+    if (commit == "HEAD" && sha == null) {
+        println("Your current branch does not have any commit yet.")
+        return
     }
+    require(sha != null) { "Could not find sha associated with name $commit" }
+
+    println("digraph myGitLog{")
+    println("   node[shape=rect]")
+    logGraphviz(repo, sha, mutableSetOf())
+    println("}")
 }
 
-class CatFile : CliktCommand(name = "cat-file") {
-    val type: String by argument(help = "Specify the type")
-        .choice("blob", "commit", "tag", "tree")
-    val objectName: String by argument(name = "object", help = "The object to display")
+fun lsTree(recursive: Boolean, tree: String) {
 
-    override fun help(context: Context) =
-        "Provide content of repository objects"
-
-    override fun run() {
-        val repo = repoFind()
-        if (repo != null) catFile(repo, objectName, type.toByteArray())
-
-    }
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+    lsTree(repo, tree, recursive)
 }
 
-class HashObject : CliktCommand(name = "hash-object") {
-    val type: String by option("-t", help = "Specify the type").choice(
-        "blob",
-        "commit",
-        "tag",
-        "tree"
-    )
-        .default("blob")
-
-    val write: Boolean by option("-w", help = "Actually write the object into the database")
-        .flag(default = false)
-    val path: String by argument(help = "Read object from <file>")
-
-    override fun help(context: Context) =
-        "Compute object ID and optionally creates a blob from a file"
-
-    override fun run() {
-        val repo = if (write) repoFind() else null
-        val sha = objectHash(File(path), type.toByteArray(), repo)
-
-        println(sha)
-    }
-}
-
-class Log : CliktCommand(name = "log") {
-    val commit: String by argument(help = "Commit to start at.").default("HEAD")
-
-    override fun help(context: Context) =
-        "Display history of a given commit."
-
-    override fun run() {
-        val repo = repoFind()
-
-        require(repo != null) { "No git repository was found." }
-
-        val sha = objectFind(repo, commit)
-        if (commit == "HEAD" && sha == null)
-        {
-            println("Your current branch does not have any commit yet.")
-            return
-        }
-        require(sha != null) { "Could not find sha associated with name $commit" }
-
-        println("digraph myGitLog{")
-        println("   node[shape=rect]")
-        logGraphviz(repo, sha, mutableSetOf())
-        println("}")
-    }
-}
-
-class LsTree : CliktCommand(name = "ls-tree") {
-
-
-    val recursive: Boolean by option("-r", help = "Recurse into sub-trees")
-        .flag(default = false)
-    val tree: String by argument(help = "A tree-ish object.")
-
-    override fun help(context: Context) =
-        "Pretty-print a tree object."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-        lsTree(repo, tree, recursive)
-    }
-}
-
-class Checkout : CliktCommand(name = "checkout") {
-
-    val commit: String by argument(help = "The commit or tree to checkout.")
-    val path: String by argument(help = "The EMPTY directory to checkout on.")
-
-    override fun help(context: Context) =
-        "Checkout a commit inside of a directory."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-        val sha = objectFind(repo, commit)
-        require(sha != null) { "Could not find sha associated with name $commit" }
-        var obj = objectRead(repo, sha)
-        require(obj != null) { "No valid object named $commit" }
-        if (obj.fmt.contentEquals("commit".toByteArray())) {
-            obj = objectRead(
-                repo,
-                (obj as GitCommit).kvlm["tree"]!!.single().decodeToString()
-            )
-        }
-
-        val pathObj = Paths.get(path)
-        if (pathObj.exists()) {
-            require(pathObj.isDirectory()) { "Not a directory $path" }
-            require(pathObj.listDirectoryEntries().isEmpty()) { "Not empty $path" }
-        } else {
-            pathObj.createDirectory()
-        }
-
-        treeCheckout(repo, (obj as GitTree), pathObj.absolute())
-    }
-}
-
-class ShowRef : CliktCommand(name = "show-ref") {
-
-    override fun help(context: Context) =
-        "List references."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-        val refs = refList(repo)
-        showRef(repo, refs, prefix = "refs")
-    }
-}
-
-class Tag : CliktCommand(name = "tag") {
-
-    val createTagObject: Boolean by option("-a", help = "Whether to create a tag object")
-        .flag(default = false)
-    val name: String? by argument(help = "The new tag's name").optional()
-    val obj by argument("object", help = "The object the new tag will point to").default("HEAD")
-
-    override fun help(context: Context) =
-        "List and create tags."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        if (name != null) {
-            tagCreate(repo, name as String, obj, createTagObject)
-        } else {
-            val refs = refList(repo)
-
-            require(Paths.get("tags") in refs.keys) { "Could not find tags folder." }
-
-            @Suppress("UNCHECKED_CAST")
-            showRef(repo, refs[Paths.get("tags")] as MutableMap<Path, Any?>, withHash = false)
-        }
-    }
-}
-
-class RevParse : CliktCommand(name = "rev-parse") {
-
-    val type: String? by option("--mgit-type", help = "Specify the  expected type")
-        .choice("blob", "commit", "tag", "tree")
-
-    val name: String by argument(help = "The new tag's name")
-
-    override fun help(context: Context) =
-        "Parse revision (or other objects) identifiers"
-
-    override fun run() {
-        val fmt = type?.encodeToByteArray()
-
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        println(objectFind(repo, name, fmt, follow = true))
-    }
-}
-
-class LsFiles : CliktCommand(name = "ls-files") {
-
-    val verbose: Boolean by option("--verbose", help = "Show everything").flag(default = false)
-
-    override fun help(context: Context) =
-        "List all the stage files"
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        val index = indexRead(repo)
-        if (verbose) println("Index file format v${index.version}, containing ${index.entries.size} entries.")
-
-        for (e in index.entries) {
-            println(e.name)
-            if (verbose) {
-                val entryType = mapOf(
-                    0b1000 to "regular file",
-                    0b1010 to "symlink",
-                    0b1110 to "git link"
-                )[e.modeType]
-
-                println("  $entryType with perms: ${e.modePerms}")
-                println("  on blob: ${e.sha}")
-                println(
-                    "  created: ${Instant.fromEpochSeconds(e.cTime.first.toLong())}.${e.cTime.second}, modified: ${
-                        Instant.fromEpochSeconds(
-                            e.mTime.first.toLong()
-                        )
-                    }.${e.mTime.second}"
-                )
-                println("  device: ${e.dev}, inode: ${e.ino}")
-                println("  user: ${e.uid}  group: ${e.gid}")
-                println("  flags: stage=${e.flagStage} assume_valid=${e.flagAssumeValid}")
-            }
-        }
-
-    }
-}
-
-
-class CheckIgnore : CliktCommand(name = "check-ignore") {
-
-    val paths: List<String> by argument("path", help = "Paths to check").multiple()
-
-    override fun help(context: Context) =
-        "Check path(s) against ignore rules."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        val rules = gitignoreRead(repo)
-        for (path in paths) {
-            if (checkIgnore(rules, path)) {
-                println(path)
-            }
-        }
-    }
-}
-
-
-class Status : CliktCommand(name = "status") {
-
-
-    override fun help(context: Context) =
-        "Show the working tree status."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        val index = indexRead(repo)
-
-        showStatusBranch(repo)
-        showStatusHeadIndex(repo, index)
-        println()
-        showStatusIndexWorktree(repo, index)
-    }
-}
-
-
-class Remove : CliktCommand(name = "rm") {
-
-    val paths: List<String> by argument("path", help = "Paths to remove").multiple()
-
-    override fun help(context: Context) =
-        "Remove files from the working tree and the index."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        rm(repo, paths)
-    }
-}
-
-
-class Add : CliktCommand(name = "add") {
-
-    val paths: List<String> by argument("path", help = "Paths to add").multiple()
-
-    override fun help(context: Context) =
-        "Add files contents to the index."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        add(repo, paths)
-    }
-}
-
-class Commit : CliktCommand(name = "commit") {
-
-    val message: String by option("-m", help = "Message to associate with this commit").required()
-
-    override fun help(context: Context) =
-        "Record changes to the repository."
-
-    override fun run() {
-        val repo = repoFind()
-        require(repo != null) { "No git repository was found." }
-
-        val index = indexRead(repo)
-        val tree = treeFromIndex(repo, index)
-            ?: throw IOException("Could not find tree from index : $index")
-        val author = getUserGitConfig(gitConfigRead())
-            ?: "Example User <could.notFind@GitConfigFile.com"
-        val commit = commitCreate(
-            repo, tree, objectFind(repo, "HEAD"),
-            author,
-            ZonedDateTime.now(),
-            message
+fun checkout(commit: String, path: String) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+    val sha = objectFind(repo, commit)
+    require(sha != null) { "Could not find sha associated with name $commit" }
+    var obj = objectRead(repo, sha)
+    require(obj != null) { "No valid object named $commit" }
+    if (obj.fmt.contentEquals("commit".toByteArray())) {
+        obj = objectRead(
+            repo,
+            (obj as GitCommit).kvlm["tree"]!!.single().decodeToString()
         )
+    }
 
-        val activeBranch = getActiveBranch(repo)
-        if (activeBranch != null) {
-            val path = repoFile(repo, Paths.get("refs/heads").resolve(activeBranch))
-                ?: throw IOException("Could not find active branch path.")
-            File(path.toString()).writeText(commit + "\n")
-        } else {
-            val path = repoFile(repo, Paths.get("HEAD"))
-                ?: throw IOException("Could not find HEAD path.")
-            File(path.toString()).writeText("\n")
-        }
+    val pathObj = Paths.get(path)
+    if (pathObj.exists()) {
+        require(pathObj.isDirectory()) { "Not a directory $path" }
+        require(pathObj.listDirectoryEntries().isEmpty()) { "Not empty $path" }
+    } else {
+        pathObj.createDirectory()
+    }
 
+    treeCheckout(repo, (obj as GitTree), pathObj.absolute())
+}
+
+fun showRef() {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+    val refs = refList(repo)
+    showRef(repo, refs, prefix = "refs")
+}
+
+fun tag(createTagObject: Boolean, name: String?, obj: String) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    if (name != null) {
+        tagCreate(repo, name, obj, createTagObject)
+    } else {
+        val refs = refList(repo)
+
+        require(Paths.get("tags") in refs.keys) { "Could not find tags folder." }
+
+        @Suppress("UNCHECKED_CAST")
+        showRef(repo, refs[Paths.get("tags")] as MutableMap<Path, Any?>, withHash = false)
     }
 }
 
-fun main(args: Array<String>) = try {
-    MGit()
-        .subcommands(Init())
-        .subcommands(CatFile())
-        .subcommands(HashObject())
-        .subcommands(Log())
-        .subcommands(LsTree())
-        .subcommands(Checkout())
-        .subcommands(ShowRef())
-        .subcommands(Tag())
-        .subcommands(RevParse())
-        .subcommands(LsFiles())
-        .subcommands(CheckIgnore())
-        .subcommands(Status())
-        .subcommands(Remove())
-        .subcommands(Add())
-        .subcommands(Commit())
-        .main(args)
-} catch (e: IOException) {
-    System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")
-} catch (e: IllegalArgumentException) {
-    System.err.println("IllegalArgumentException at ${e.stackTrace.first().lineNumber}: ${e.message}")
+fun revParse(type: String?, name: String) {
+    val fmt = type?.encodeToByteArray()
+
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    println(objectFind(repo, name, fmt, follow = true))
 }
 
+fun lsFiles(verbose: Boolean) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    val index = indexRead(repo)
+    if (verbose) println("Index file format v${index.version}, containing ${index.entries.size} entries.")
+
+    for (e in index.entries) {
+        println(e.name)
+        if (verbose) {
+            val entryType = mapOf(
+                0b1000 to "regular file",
+                0b1010 to "symlink",
+                0b1110 to "git link"
+            )[e.modeType]
+
+            println("  $entryType with perms: ${e.modePerms}")
+            println("  on blob: ${e.sha}")
+            println(
+                "  created: ${Instant.fromEpochSeconds(e.cTime.first.toLong())}.${e.cTime.second}, modified: ${
+                    Instant.fromEpochSeconds(
+                        e.mTime.first.toLong()
+                    )
+                }.${e.mTime.second}"
+            )
+            println("  device: ${e.dev}, inode: ${e.ino}")
+            println("  user: ${e.uid}  group: ${e.gid}")
+            println("  flags: stage=${e.flagStage} assume_valid=${e.flagAssumeValid}")
+        }
+    }
+
+}
+
+
+fun checkIgnore(paths: List<String>) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    val rules = gitignoreRead(repo)
+    for (path in paths) {
+        if (checkIgnore(rules, path)) {
+            println(path)
+        }
+    }
+}
+
+
+fun status() {
+
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    val index = indexRead(repo)
+
+    showStatusBranch(repo)
+    showStatusHeadIndex(repo, index)
+    println()
+    showStatusIndexWorktree(repo, index)
+}
+
+fun remove(paths: List<String>) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    rm(repo, paths)
+}
+
+
+fun add(paths: List<String>) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    add(repo, paths)
+
+}
+
+fun commit(message: String) {
+    val repo = repoFind()
+    require(repo != null) { "No git repository was found." }
+
+    val index = indexRead(repo)
+    val tree = treeFromIndex(repo, index)
+        ?: throw IOException("Could not find tree from index : $index")
+    val author = getUserGitConfig(gitConfigRead())
+        ?: "Example User <could.notFind@GitConfigFile.com"
+    val commit = commitCreate(
+        repo, tree, objectFind(repo, "HEAD"),
+        author,
+        ZonedDateTime.now(),
+        message
+    )
+
+    val activeBranch = getActiveBranch(repo)
+    if (activeBranch != null) {
+        val path = repoFile(repo, Paths.get("refs/heads").resolve(activeBranch))
+            ?: throw IOException("Could not find active branch path.")
+        File(path.toString()).writeText(commit + "\n")
+    } else {
+        val path = repoFile(repo, Paths.get("HEAD"))
+            ?: throw IOException("Could not find HEAD path.")
+        File(path.toString()).writeText("\n")
+    }
+
+}
