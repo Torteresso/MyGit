@@ -2,7 +2,7 @@
 clikt = "5.1.0"
 junitBom = "6.0.3"
 kotlin = "2.3.20"
-agp = "9.1.0"
+agp = "9.1.1"
 activityKtx = "1.13.0"
 lifecycleViewmodelCompose = "2.10.0"
 
