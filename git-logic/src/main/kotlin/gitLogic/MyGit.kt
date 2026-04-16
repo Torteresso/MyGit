@@ -19,7 +19,6 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
-import kotlin.String
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
@@ -68,7 +67,7 @@ data class GitRepository(val worktree: Path, val force: Boolean = false) {
 }
 
 fun repoPath(repo: GitRepository, vararg path: Path): Path {
-    return path.fold(repo.gitdir) {acc, path -> acc.resolve(path)}
+    return path.fold(repo.gitdir) { acc, path -> acc.resolve(path) }
 }
 
 fun repoFile(repo: GitRepository, vararg path: Path, mkdir: Boolean = false): Path? {
@@ -140,7 +139,10 @@ fun repoCreate(path: Path): GitRepository {
     return repo
 }
 
-fun repoFind(path: Path = Paths.get(System.getProperty("user.dir")), required: Boolean = true): GitRepository? {
+fun repoFind(
+    path: Path = Paths.get(System.getProperty("user.dir")),
+    required: Boolean = true
+): GitRepository? {
 
     if (path.resolve(".git").isDirectory()) {
         return GitRepository(path)
@@ -361,7 +363,7 @@ fun objectFind(
         if (name == "HEAD" && sha == null) throw IOException("In mgit, you must have at least one commit to check status.")
         require(sha != null) { "Sha should not be null for reference $name." }
         val obj = objectRead(repo, sha)
-        require(obj != null){"Could not read object with sha : $sha"}
+        require(obj != null) { "Could not read object with sha : $sha" }
 
         if (obj.fmt.contentEquals(fmt)) return sha
         if (!follow) return null
@@ -783,7 +785,7 @@ fun indexRead(repo: GitRepository): GitIndex {
         val uid = ByteBuffer.wrap(content, idx + 28, 4).int
         val gid = ByteBuffer.wrap(content, idx + 32, 4).int
         val fSize = ByteBuffer.wrap(content, idx + 36, 4).int
-        val sha = content.sliceArray(idx+40..<idx+60).toHexString()
+        val sha = content.sliceArray(idx + 40..<idx + 60).toHexString()
         val flags = ByteBuffer.wrap(content, idx + 60, 2).short.toInt().and(0xFFFF)
 
         require(unused == 0) { "Unused variable should be 0" }
@@ -912,7 +914,7 @@ fun checkIgnoreScoped(
     rules: Map<String, MutableList<Pair<String, Boolean>?>>,
     path: String
 ): Boolean? {
-    var parent = path.substringBeforeLast('/', missingDelimiterValue ="")
+    var parent = path.substringBeforeLast('/', missingDelimiterValue = "")
 
     while (true) {
         if (parent in rules) {
@@ -921,7 +923,7 @@ fun checkIgnoreScoped(
         }
         if (parent.isEmpty()) break
 
-        parent = parent.substringBeforeLast('/',  missingDelimiterValue ="")
+        parent = parent.substringBeforeLast('/', missingDelimiterValue = "")
     }
 
     return null
@@ -952,7 +954,7 @@ fun getActiveBranch(repo: GitRepository): String? {
     val head = File(headFile.toString()).readText()
 
     return if (head.startsWith("ref: refs/heads/")) {
-        head.substring(16..<head.length -1)
+        head.substring(16..<head.length - 1)
     } else null
 }
 
@@ -1028,7 +1030,10 @@ fun showStatusIndexWorktree(repo: GitRepository, index: GitIndex) {
             val fileCTimeNs =
                 (Files.getAttribute(fullPath, "unix:ctime") as FileTime).to(TimeUnit.NANOSECONDS)
             val fileMTimeNs =
-                (Files.getAttribute(fullPath, "unix:lastModifiedTime") as FileTime).to(TimeUnit.NANOSECONDS)
+                (Files.getAttribute(
+                    fullPath,
+                    "unix:lastModifiedTime"
+                ) as FileTime).to(TimeUnit.NANOSECONDS)
 
             if (cTimeNs != fileCTimeNs || mTimeNs != fileMTimeNs) {
                 val newSha = objectHash(File(fullPath.toString()), "blob".toByteArray(), null)
@@ -1135,18 +1140,15 @@ fun rm(
     if (delete) {
         for (path in remove) {
             print("Are you sure you want to delete $path ? (y/n)  ")
-            while(true) {
+            while (true) {
                 val userResponse = readln()
                 if (userResponse == "y") {
                     Paths.get(path).deleteIfExists()
                     break
-                }
-                else if (userResponse == "n")
-                {
+                } else if (userResponse == "n") {
                     println("Cancelled removal of all items in $remove")
                     return
-                }
-                else print("Type 'y' for yes and 'n' for no.  ")
+                } else print("Type 'y' for yes and 'n' for no.  ")
             }
         }
     }
@@ -1184,7 +1186,9 @@ fun add(
             "unix:ctime"
         ) as FileTime).to(TimeUnit.NANOSECONDS) % 1_000_000_000L
         val mTimeS =
-            (Files.getAttribute(Paths.get(absPath), "unix:lastModifiedTime") as FileTime).to(TimeUnit.SECONDS)
+            (Files.getAttribute(Paths.get(absPath), "unix:lastModifiedTime") as FileTime).to(
+                TimeUnit.SECONDS
+            )
         val mTimeNs = (Files.getAttribute(
             Paths.get(absPath),
             "unix:lastModifiedTime"
@@ -1539,4 +1543,10 @@ fun commit(message: String) {
         File(path.toString()).writeText("\n")
     }
 
+}
+
+fun getCurrentPath(): String {
+    val allDir = Paths.get(".").listDirectoryEntries()
+    val ret = allDir.fold("", { s, p -> "$s+$p" })
+    return ret
 }
