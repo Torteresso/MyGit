@@ -1,4 +1,3 @@
-
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
@@ -12,13 +11,13 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
+import gitLogic.JGit
 import gitLogic.add
 import gitLogic.catFile
 import gitLogic.checkIgnore
 import gitLogic.checkout
 import gitLogic.commit
 import gitLogic.hashObject
-import gitLogic.init
 import gitLogic.log
 import gitLogic.lsFiles
 import gitLogic.lsTree
@@ -30,6 +29,8 @@ import gitLogic.tag
 import java.io.IOException
 
 
+val gitCommands = JGit()
+
 class MGit : CliktCommand() {
     override fun run() = Unit
 }
@@ -40,7 +41,7 @@ class Init : CliktCommand(name = "init") {
         "Create an empty Git repository or reinitialize an existing one"
 
     override fun run() {
-        init(path)
+        gitCommands.init(path)
     }
 }
 
