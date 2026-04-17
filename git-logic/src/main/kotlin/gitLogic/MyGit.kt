@@ -121,7 +121,6 @@ fun repoCreate(path: Path): GitRepository {
         repo.worktree.createDirectories()
     }
 
-    repoDir(repo, Paths.get("branches"), mkdir = true)
     repoDir(repo, Paths.get("objects"), mkdir = true)
     repoDir(repo, Paths.get("refs", "tags"), mkdir = true)
     repoDir(repo, Paths.get("refs", "heads"), mkdir = true)

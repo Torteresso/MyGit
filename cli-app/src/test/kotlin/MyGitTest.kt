@@ -1,4 +1,5 @@
 import com.github.ajalt.clikt.testing.test
+import gitLogic.MyGit
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -29,6 +30,8 @@ import kotlin.io.path.writeText
 annotation class SkipGitFolderCheck
 
 class MyGitTest {
+
+    private val gitCommands = MyGit()
 
     @TempDir
     lateinit var workingDirectory: Path
@@ -74,7 +77,6 @@ class MyGitTest {
         }
 
         assertTrue(workingDirectory.resolve(".git").isDirectory())
-        assertTrue(workingDirectory.resolve(".git/branches").isDirectory())
         assertTrue(workingDirectory.resolve(".git/objects").isDirectory())
         assertTrue(workingDirectory.resolve(".git/refs/tags").isDirectory())
         assertTrue(workingDirectory.resolve(".git/refs/heads").isDirectory())
@@ -85,7 +87,7 @@ class MyGitTest {
 
     @Test
     fun initCommand_InEmptyDir_MyGitDirIsCreated() {
-        val command = Init()
+        val command = Init(gitCommands)
         val result = command.test(workingDirectory.toString())
 
         assertEquals(0, result.statusCode)
@@ -99,7 +101,7 @@ class MyGitTest {
     fun initCommand_NonEmptyDir_MyGitDirIsReinitialize() {
         workingDirectory.resolve(".git").createDirectory()
         workingDirectory.resolve(".git/test.txt").createFile()
-        val command = Init()
+        val command = Init(gitCommands)
 
         assertThrows<IllegalArgumentException> { command.test(workingDirectory.toString()) }
     }
@@ -120,7 +122,7 @@ class MyGitTest {
         testFile.writeText("This is a test.\n")
         assertTrue(testFile.isReadable())
 
-        Init().test(workingDirectory.toString())
+        Init(gitCommands).test(workingDirectory.toString())
         return testFile
     }
 
@@ -151,7 +153,7 @@ class MyGitTest {
 
     @Test
     fun logCommand_WithNoCommitYet_WarnUser() {
-        Init().test(workingDirectory.toString())
+        Init(gitCommands).test(workingDirectory.toString())
         Log().test()
 
         assertEquals("Your current branch does not have any commit yet.\n", outContent.toString())
@@ -159,7 +161,7 @@ class MyGitTest {
 
     @Test
     fun commitCommand_InEmptyGitDir_CreateCommitAndEmptyTreeObject() {
-        Init().test(workingDirectory.toString())
+        Init(gitCommands).test(workingDirectory.toString())
 
         Commit().test("-m \"Initial commit\"")
 
@@ -226,7 +228,7 @@ class MyGitTest {
 
     @Test
     fun allCommands_ForTypicalUserFlow_ShouldNotThrow() {
-        Init().test(workingDirectory.toString())
+        Init(gitCommands).test(workingDirectory.toString())
         Commit().test("-m \"Initial commit\"")
 
         val testFile = workingDirectory.resolve("test.txt")
