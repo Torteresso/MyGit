@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     // Optional - Integration with LiveData
     implementation(libs.runtime.livedata)
+    // Perf
+    implementation(libs.runtime.tracing)
     // GitLogic
     implementation(project(":git-logic"))
 

@@ -22,6 +22,7 @@ foundation = { module = "androidx.compose.foundation:foundation" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 material3 = { module = "androidx.compose.material3:material3" }
 runtime-livedata = { module = "androidx.compose.runtime:runtime-livedata" }
+runtime-tracing = { module = "androidx.compose.runtime:runtime-tracing" }
 ui = { module = "androidx.compose.ui:ui" }
 ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
