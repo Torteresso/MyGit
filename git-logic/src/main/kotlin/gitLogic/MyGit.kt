@@ -121,7 +121,6 @@ fun repoCreate(path: Path): GitRepository {
         repo.worktree.createDirectories()
     }
 
-    repoDir(repo, Paths.get("branches"), mkdir = true)
     repoDir(repo, Paths.get("objects"), mkdir = true)
     repoDir(repo, Paths.get("refs", "tags"), mkdir = true)
     repoDir(repo, Paths.get("refs", "heads"), mkdir = true)
@@ -1338,6 +1337,12 @@ fun commitCreate(
     commit.kvlm[null] = mutableListOf(message.encodeToByteArray())
 
     return objectWrite(commit, repo)
+}
+
+class MyGit : GitCommands {
+    override fun init(path: String) {
+        repoCreate(Paths.get(path))
+    }
 }
 
 fun init(path: String) {

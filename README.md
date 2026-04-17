@@ -1,6 +1,6 @@
 ### MGIT
 
-An partial implementation of the Git version control in Kotlin.
+A partial implementation of the Git version control in Kotlin.
 
 ### Install
 
