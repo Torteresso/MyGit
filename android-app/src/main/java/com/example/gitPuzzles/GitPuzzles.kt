@@ -1,11 +1,11 @@
-package com.example.android_app
+package com.example.gitPuzzles
 
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.example.android_app.ui.HomeScreen
+import com.example.gitPuzzles.ui.HomeScreen
 import kotlinx.serialization.Serializable
 
 @Serializable

@@ -1,4 +1,4 @@
-package com.example.android_app
+package com.example.gitPuzzles
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

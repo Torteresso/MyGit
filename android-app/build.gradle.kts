@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.android_app"
+    namespace = "com.example.gitPuzzles"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.android_app"
+        applicationId = "com.example.gitPuzzles"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
