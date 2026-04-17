@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
 android {
-    namespace = "com.example.android_app"
+    namespace = "com.example.gitPuzzles"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.android_app"
+        applicationId = "com.example.gitPuzzles"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -42,6 +43,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigation3.ui)
     val composeBom = platform("androidx.compose:compose-bom:2026.03.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -65,9 +68,13 @@ dependencies {
     // Optional - Integration with ViewModels
     implementation(libs.lifecycle.viewmodel.compose)
     // Optional - Integration with LiveData
+
     implementation(libs.runtime.livedata)
     // Perf
     implementation(libs.runtime.tracing)
+    // For nav3
+    implementation(libs.kotlinx.serialization.core)
+
     // GitLogic
     implementation(project(":git-logic"))
 
