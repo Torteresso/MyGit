@@ -1,6 +1,7 @@
 package com.example.gitPuzzles
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -12,7 +13,7 @@ import kotlinx.serialization.Serializable
 data object Home : NavKey
 
 @Composable
-fun GitPuzzles() {
+fun GitPuzzles(modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(Home)
 
     NavDisplay(
@@ -20,7 +21,7 @@ fun GitPuzzles() {
         onBack = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
             entry<Home> {
-                HomeScreen()
+                HomeScreen(modifier)
             }
         }
 
