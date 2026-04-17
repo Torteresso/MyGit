@@ -33,8 +33,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -74,6 +74,10 @@ dependencies {
     implementation(libs.runtime.tracing)
     // For nav3
     implementation(libs.kotlinx.serialization.core)
+
+    // Icons
+    implementation(libs.material.icons.core)
+    implementation(libs.material.icons.extended)
 
     // GitLogic
     implementation(project(":git-logic"))
