@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import gitLogic.GitCommand
 import gitLogic.JGit
 import gitLogic.getActiveBranch
 import gitLogic.repoDelete
@@ -21,7 +22,11 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
 
-data class HomeUiState(val activeBranch: String? = null, val needRefresh: Boolean = true)
+data class HomeUiState(
+    val activeBranch: String? = null,
+    val needRefresh: Boolean = true,
+    val currentCommand: GitCommand = GitCommand.Init
+)
 
 sealed class HomeUiEvent {
     data class ShowSnackBar(val message: String) : HomeUiEvent()
@@ -73,9 +78,24 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    fun initGitRepository() {
-        JGit().init(workingDirectory.toString())
-        requestRefresh()
+    fun executeCurrentCommand() {
+        viewModelScope.launch(Dispatchers.IO)
+        {
+            when (_homeUiState.value.currentCommand) {
+                is GitCommand.Init -> {
+                    JGit().init(workingDirectory.toString())
+                }
+
+                is GitCommand.Status -> {
+                    TODO()
+                }
+            }
+            requestRefresh()
+        }
+    }
+
+    fun changeCurrentCommand(newCommand: GitCommand) {
+        _homeUiState.update { currentState -> currentState.copy(currentCommand = newCommand) }
     }
 
 
