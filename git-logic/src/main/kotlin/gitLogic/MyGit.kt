@@ -4,6 +4,7 @@ import org.apache.commons.configuration2.INIConfiguration
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
@@ -19,10 +20,12 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
+import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
@@ -1337,6 +1340,14 @@ fun commitCreate(
     commit.kvlm[null] = mutableListOf(message.encodeToByteArray())
 
     return objectWrite(commit, repo)
+}
+
+@OptIn(ExperimentalPathApi::class)
+fun repoDelete(gitPath: Path) {
+    if (!gitPath.endsWith(".git")) throw FileNotFoundException("Git path must end with .git")
+    if (!gitPath.isDirectory()) throw FileNotFoundException(".git must be a folder")
+
+    gitPath.deleteRecursively()
 }
 
 class MyGit : GitCommands {

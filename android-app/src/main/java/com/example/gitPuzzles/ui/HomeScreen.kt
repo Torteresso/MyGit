@@ -19,6 +19,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,14 +30,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gitPuzzles.R
-import gitLogic.JGit
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val workingDirectory = remember { context.applicationContext.filesDir.toPath() }
+    val viewModel: HomeViewModel =
+        viewModel(factory = HomeViewModel.provideFactory(workingDirectory))
+
     val homeUiState by viewModel.homeUiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(homeUiState.needRefresh) {
+        viewModel.checkActiveBranch()
+    }
 
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
@@ -49,11 +57,13 @@ fun HomeScreen(
             val context = LocalContext.current
             val gitDir = remember { context.applicationContext.filesDir.toString() }
 
-            HomeScreenTopBar(homeUiState.activeBranch, modifier = Modifier.fillMaxWidth())
+            HomeScreenTopBar(
+                activeBranch = homeUiState.activeBranch,
+                onDeleteButtonClick = { viewModel.deleteGitRepository() },
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = {
-                JGit().init(gitDir)
-            })
+            Button(onClick = { viewModel.initGitRepository() })
             {
                 Text("init")
             }
@@ -62,7 +72,11 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeScreenTopBar(activeBranch: String?, modifier: Modifier = Modifier) {
+fun HomeScreenTopBar(
+    activeBranch: String?,
+    onDeleteButtonClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Surface(modifier = modifier) {
         Box(
             contentAlignment = Alignment.Center,
@@ -73,7 +87,7 @@ fun HomeScreenTopBar(activeBranch: String?, modifier: Modifier = Modifier) {
         {
             GitStatusSurface(activeBranch)
             IconButton(
-                onClick = {},
+                onClick = onDeleteButtonClick,
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Icon(
