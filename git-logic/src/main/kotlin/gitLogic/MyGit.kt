@@ -1350,7 +1350,7 @@ fun repoDelete(gitPath: Path) {
     gitPath.deleteRecursively()
 }
 
-class MyGit : GitCommands {
+class MyGitFunctions : GitCommandsFunctions {
     override fun init(path: String) {
         repoCreate(Paths.get(path))
     }

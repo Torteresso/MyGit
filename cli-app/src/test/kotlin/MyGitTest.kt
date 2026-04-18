@@ -1,5 +1,5 @@
 import com.github.ajalt.clikt.testing.test
-import gitLogic.MyGit
+import gitLogic.MyGitFunctions
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -31,7 +31,7 @@ annotation class SkipGitFolderCheck
 
 class MyGitTest {
 
-    private val gitCommands = MyGit()
+    private val gitCommands = MyGitFunctions()
 
     @TempDir
     lateinit var workingDirectory: Path

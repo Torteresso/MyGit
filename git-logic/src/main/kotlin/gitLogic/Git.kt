@@ -1,5 +1,5 @@
 package gitLogic
 
-interface GitCommands {
+interface GitCommandsFunctions {
     fun init(path: String)
 }
