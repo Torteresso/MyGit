@@ -11,7 +11,9 @@ import gitLogic.getActiveBranch
 import gitLogic.repoDelete
 import gitLogic.repoFind
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -21,10 +23,17 @@ import java.nio.file.Path
 
 data class HomeUiState(val activeBranch: String? = null, val needRefresh: Boolean = true)
 
+sealed class HomeUiEvent {
+    data class ShowSnackBar(val message: String) : HomeUiEvent()
+}
+
 class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     private val _homeUiState = MutableStateFlow(HomeUiState())
-
     val homeUiState = _homeUiState.asStateFlow()
+
+    private val _homeUiEvent = MutableSharedFlow<HomeUiEvent>()
+    val homeUiEvent = _homeUiEvent.asSharedFlow()
+
 
     fun checkActiveBranch() {
         viewModelScope.launch(Dispatchers.IO)
@@ -49,11 +58,18 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             requestRefresh()
         } catch (e: FileNotFoundException) {
             Log.d("HomeScreen_DeleteButton", "Try to delete git dir at $gitDir, but ${e.message}")
+            viewModelScope.launch {
+                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Git repo is already deleted"))
+            }
+
         } catch (e: IOException) {
             Log.wtf(
                 "HomeScreen_DeleteButton",
                 "IO Exception when trying to delete git repo at path $gitDir, initial error : ${e.message}"
             )
+            viewModelScope.launch {
+                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Deletion failed: Internal error"))
+            }
         }
     }
 
@@ -61,6 +77,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         JGit().init(workingDirectory.toString())
         requestRefresh()
     }
+
 
     private fun requestRefresh() {
         _homeUiState.update { currentState -> currentState.copy(needRefresh = true) }

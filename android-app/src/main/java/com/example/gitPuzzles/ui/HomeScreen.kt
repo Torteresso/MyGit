@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gitPuzzles.R
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun HomeScreen(
@@ -46,6 +49,19 @@ fun HomeScreen(
         viewModel.checkActiveBranch()
     }
 
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.homeUiEvent.collectLatest { event ->
+            when (event) {
+                is HomeUiEvent.ShowSnackBar -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
+
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -54,15 +70,15 @@ fun HomeScreen(
                 .navigationBarsPadding()
         )
         {
-            val context = LocalContext.current
-            val gitDir = remember { context.applicationContext.filesDir.toString() }
-
             HomeScreenTopBar(
                 activeBranch = homeUiState.activeBranch,
-                onDeleteButtonClick = { viewModel.deleteGitRepository() },
+                onDeleteButtonClick = {
+                    viewModel.deleteGitRepository()
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.weight(1f))
+            SnackbarHost(hostState = snackbarHostState)
             Button(onClick = { viewModel.initGitRepository() })
             {
                 Text("init")
