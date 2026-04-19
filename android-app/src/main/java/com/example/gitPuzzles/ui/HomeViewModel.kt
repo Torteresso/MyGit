@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import gitLogic.GitCommand
+import gitLogic.InitConfig
 import gitLogic.JGit
 import gitLogic.getActiveBranch
 import gitLogic.repoDelete
@@ -83,7 +84,12 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         {
             when (_homeUiState.value.currentCommand) {
                 is GitCommand.Init -> {
-                    JGit().init(workingDirectory.toString())
+                    JGit().init(
+                        InitConfig(
+                            path = workingDirectory.toString(),
+                            initialBranchName = "myBranch"
+                        )
+                    )
                 }
 
                 is GitCommand.Status -> {

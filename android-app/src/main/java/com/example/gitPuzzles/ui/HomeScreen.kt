@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
@@ -151,8 +149,10 @@ fun HomeScreenBottomBar(
                 .padding(4.dp)
         )
         {
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
                 TextButton(onClick = { onCommandButtonClick() }) {
                     Text(text = "git ${currentCommand.name}")
                 }
@@ -180,8 +180,7 @@ fun CommandChooser(
             modifier = modifier
                 .fillMaxWidth()
                 .height(300.dp)
-                .padding(16.dp)
-                ,
+                .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
         ) {
             LazyVerticalGrid(
@@ -230,27 +229,24 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
 
 @Preview
 @Composable
-fun GitStatusSurfacePreview()
-{
+fun GitStatusSurfacePreview() {
     GitStatusSurface("master")
 }
 
 @Preview
 @Composable
-fun CommandChooserPreview()
-{
+fun CommandChooserPreview() {
     CommandChooser({}, {})
 }
 
 @Preview
 @Composable
-fun HomeScreenBottomBarPreview()
-{
+fun HomeScreenBottomBarPreview() {
     HomeScreenBottomBar({}, {}, GitCommand.Init)
 }
+
 @Preview
 @Composable
-fun HomeScreenTopBarPreview()
-{
+fun HomeScreenTopBarPreview() {
     HomeScreenTopBar("master", {})
 }
