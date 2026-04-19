@@ -225,3 +225,30 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Preview
+@Composable
+fun GitStatusSurfacePreview()
+{
+    GitStatusSurface("master")
+}
+
+@Preview
+@Composable
+fun CommandChooserPreview()
+{
+    CommandChooser({}, {})
+}
+
+@Preview
+@Composable
+fun HomeScreenBottomBarPreview()
+{
+    HomeScreenBottomBar({}, {}, GitCommand.Init)
+}
+@Preview
+@Composable
+fun HomeScreenTopBarPreview()
+{
+    HomeScreenTopBar("master", {})
+}
