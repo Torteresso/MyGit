@@ -4,14 +4,14 @@ interface GitCommandsFunctions {
     fun init(path: String)
 }
 
-sealed class GitCommand {
+sealed interface GitCommand {
     abstract val name: String
 
-    data object Init : GitCommand() {
+    data object Init : GitCommand {
         override val name: String = "init"
     }
 
-    data object Status : GitCommand() {
+    data object Status : GitCommand {
         override val name: String = "status"
     }
 

@@ -87,7 +87,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 }
 
                 is GitCommand.Status -> {
-                    TODO()
+                    //TODO
                 }
             }
             requestRefresh()

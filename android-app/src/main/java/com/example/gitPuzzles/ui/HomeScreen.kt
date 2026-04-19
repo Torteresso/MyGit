@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -150,7 +151,8 @@ fun HomeScreenBottomBar(
                 .padding(4.dp)
         )
         {
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center) {
                 TextButton(onClick = { onCommandButtonClick() }) {
                     Text(text = "git ${currentCommand.name}")
                 }
@@ -179,11 +181,11 @@ fun CommandChooser(
                 .fillMaxWidth()
                 .height(300.dp)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                ,
             shape = RoundedCornerShape(16.dp),
         ) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize()
             )
             {
