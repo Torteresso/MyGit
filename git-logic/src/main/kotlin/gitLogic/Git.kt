@@ -21,6 +21,21 @@ data class InitConfig(
     val initialBranchName: String? = null
 )
 
+data class AddConfig(
+    val repoDirectory: String,
+    val filesToAdd: List<String>
+)
+
+data class CommitConfig(
+    val repoDirectory: String,
+    val message: String,
+)
+
 interface GitCommandsFunctions {
     fun init(config: InitConfig)
+
+    fun add(config: AddConfig)
+    fun commit(config: CommitConfig)
 }
+
+

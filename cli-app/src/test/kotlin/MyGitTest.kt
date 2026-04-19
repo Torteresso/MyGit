@@ -163,7 +163,7 @@ class MyGitTest {
     fun commitCommand_InEmptyGitDir_CreateCommitAndEmptyTreeObject() {
         Init(gitCommands).test(workingDirectory.toString())
 
-        Commit().test("-m \"Initial commit\"")
+        Commit(gitCommands).test("-m \"Initial commit\"")
 
         assertTrue(workingDirectory.resolve(".git/refs/heads/master").isReadable())
 
@@ -191,8 +191,8 @@ class MyGitTest {
     fun addCommand_ForOneFile_AddTheFileToGitDir() {
         val testFile = writeSomeTestsFilesInGitRepo()
 
-        Commit().test("-m \"Initial commit\"")
-        Add().test(testFile.toString())
+        Commit(gitCommands).test("-m \"Initial commit\"")
+        Add(gitCommands).test(testFile.toString())
 
         HashObject().test(testFile.toString())
 
@@ -229,7 +229,7 @@ class MyGitTest {
     @Test
     fun allCommands_ForTypicalUserFlow_ShouldNotThrow() {
         Init(gitCommands).test(workingDirectory.toString())
-        Commit().test("-m \"Initial commit\"")
+        Commit(gitCommands).test("-m \"Initial commit\"")
 
         val testFile = workingDirectory.resolve("test.txt")
         testFile.writeText("This is a test.\n")
@@ -242,14 +242,14 @@ class MyGitTest {
             "", "", listOf("fileToIgnore.txt", "test.txt", ".gitignore")
         )
 
-        Add().test("$gitignoreFile $testFile")
+        Add(gitCommands).test("$gitignoreFile $testFile")
 
         checkStatus(
             "\n  added:    .gitignore\n" +
                     "  added:    test.txt", "", untrackedAbsent = listOf("fileToIgnore.txt")
         )
 
-        Commit().test("-m \"Add my files.\"")
+        Commit(gitCommands).test("-m \"Add my files.\"")
 
         Tag().test()
         assertEquals("", outContent.toString())
@@ -287,8 +287,8 @@ class MyGitTest {
 
         checkStatus("", "\n  modified:    test.txt", untrackedAbsent = listOf("fileToIgnore.txt"))
 
-        Add().test(testFile.toString())
-        Commit().test("-m \"Append some text to test.txt\"")
+        Add(gitCommands).test(testFile.toString())
+        Commit(gitCommands).test("-m \"Append some text to test.txt\"")
 
         Log().test()
         assertTrue(outContent.toString().contains("Add my files"))
@@ -334,7 +334,7 @@ class MyGitTest {
 
         checkStatus("\n  deleted:    test.txt", "", untrackedAbsent = listOf("fileToIgnore.txt"))
 
-        Commit().test("-m \"Deleted the test file\"")
+        Commit(gitCommands).test("-m \"Deleted the test file\"")
 
         checkStatus("", "", untrackedAbsent = listOf("fileToIgnore.txt"))
 

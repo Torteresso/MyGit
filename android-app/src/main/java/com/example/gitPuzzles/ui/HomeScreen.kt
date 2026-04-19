@@ -221,7 +221,7 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("master")
+                Text(activeBranch)
             } else Text("No git repository")
         }
     }
@@ -230,7 +230,7 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
 @Preview
 @Composable
 fun GitStatusSurfacePreview() {
-    GitStatusSurface("master")
+    GitStatusSurface("testBranch")
 }
 
 @Preview
@@ -248,5 +248,5 @@ fun HomeScreenBottomBarPreview() {
 @Preview
 @Composable
 fun HomeScreenTopBarPreview() {
-    HomeScreenTopBar("master", {})
+    HomeScreenTopBar("testBranch", {})
 }

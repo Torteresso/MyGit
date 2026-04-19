@@ -11,14 +11,14 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
+import gitLogic.AddConfig
+import gitLogic.CommitConfig
 import gitLogic.GitCommandsFunctions
 import gitLogic.InitConfig
 import gitLogic.JGit
-import gitLogic.add
 import gitLogic.catFile
 import gitLogic.checkIgnore
 import gitLogic.checkout
-import gitLogic.commit
 import gitLogic.hashObject
 import gitLogic.log
 import gitLogic.lsFiles
@@ -209,7 +209,7 @@ class Remove : CliktCommand(name = "rm") {
 }
 
 
-class Add : CliktCommand(name = "add") {
+class Add(private val gitCommands: GitCommandsFunctions) : CliktCommand(name = "add") {
 
     val paths: List<String> by argument("path", help = "Paths to add").multiple()
 
@@ -217,11 +217,11 @@ class Add : CliktCommand(name = "add") {
         "Add files contents to the index."
 
     override fun run() {
-        add(paths)
+        gitCommands.add(AddConfig(repoDirectory = ".", filesToAdd = paths))
     }
 }
 
-class Commit : CliktCommand(name = "commit") {
+class Commit(private val gitCommands: GitCommandsFunctions) : CliktCommand(name = "commit") {
 
     val message: String by option("-m", help = "Message to associate with this commit").required()
 
@@ -229,7 +229,7 @@ class Commit : CliktCommand(name = "commit") {
         "Record changes to the repository."
 
     override fun run() {
-        commit(message)
+        gitCommands.commit(CommitConfig(repoDirectory = ".", message = message))
     }
 }
 
@@ -249,8 +249,8 @@ fun main(args: Array<String>) = try {
         .subcommands(CheckIgnore())
         .subcommands(Status())
         .subcommands(Remove())
-        .subcommands(Add())
-        .subcommands(Commit())
+        .subcommands(Add(gitCommands))
+        .subcommands(Commit(gitCommands))
         .main(args)
 } catch (e: IOException) {
     System.err.println("IOException at ${e.stackTrace.first().lineNumber}: ${e.message}")

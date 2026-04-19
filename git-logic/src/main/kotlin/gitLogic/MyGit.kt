@@ -1354,6 +1354,14 @@ class MyGitFunctions : GitCommandsFunctions {
     override fun init(config: InitConfig) {
         repoCreate(Paths.get(config.path))
     }
+
+    override fun add(config: AddConfig) {
+        add(config.filesToAdd)
+    }
+
+    override fun commit(config: CommitConfig) {
+        commit(config.message)
+    }
 }
 
 fun catFile(type: String, objectName: String) {
@@ -1525,7 +1533,6 @@ fun add(paths: List<String>) {
     require(repo != null) { "No git repository was found." }
 
     add(repo, paths)
-
 }
 
 fun commit(message: String) {
