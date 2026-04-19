@@ -1351,13 +1351,9 @@ fun repoDelete(gitPath: Path) {
 }
 
 class MyGitFunctions : GitCommandsFunctions {
-    override fun init(path: String) {
-        repoCreate(Paths.get(path))
+    override fun init(config: InitConfig) {
+        repoCreate(Paths.get(config.path))
     }
-}
-
-fun init(path: String) {
-    repoCreate(Paths.get(path))
 }
 
 fun catFile(type: String, objectName: String) {
@@ -1559,10 +1555,4 @@ fun commit(message: String) {
         File(path.toString()).writeText("\n")
     }
 
-}
-
-fun getCurrentPath(): String {
-    val allDir = Paths.get(".").listDirectoryEntries()
-    val ret = allDir.fold("", { s, p -> "$s+$p" })
-    return ret
 }

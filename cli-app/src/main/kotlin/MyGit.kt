@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import gitLogic.GitCommandsFunctions
+import gitLogic.InitConfig
 import gitLogic.JGit
 import gitLogic.add
 import gitLogic.catFile
@@ -40,7 +41,7 @@ class Init(private val gitCommands: GitCommandsFunctions) : CliktCommand(name = 
         "Create an empty Git repository or reinitialize an existing one"
 
     override fun run() {
-        gitCommands.init(path)
+        gitCommands.init(InitConfig(path = path))
     }
 }
 
