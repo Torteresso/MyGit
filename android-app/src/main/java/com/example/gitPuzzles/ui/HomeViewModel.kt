@@ -1,11 +1,22 @@
 package com.example.gitPuzzles.ui
 
 import android.util.Log
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.gitPuzzles.themlng.Black
+import com.example.gitPuzzles.themlng.Blue
+import com.example.gitPuzzles.themlng.Brown
+import com.example.gitPuzzles.themlng.Green
+import com.example.gitPuzzles.themlng.Olive
+import com.example.gitPuzzles.themlng.Orange
+import com.example.gitPuzzles.themlng.Pink
+import com.example.gitPuzzles.themlng.Purple
+import com.example.gitPuzzles.themlng.Red
+import com.example.gitPuzzles.themlng.White
 import gitLogic.GitCommand
 import gitLogic.InitConfig
 import gitLogic.JGit
@@ -19,14 +30,27 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+
+private data class FileInternalState(
+    val path: Path,
+    val color: Color = White
+)
+
+data class FileUiState(
+    val color: Color = White,
+)
 
 data class HomeUiState(
     val activeBranch: String? = null,
     val needRefresh: Boolean = true,
-    val currentCommand: GitCommand = GitCommand.Init
+    val currentCommand: GitCommand = GitCommand.Init,
+    val filesUiState: List<FileUiState> = listOf()
 )
 
 sealed class HomeUiEvent {
@@ -40,6 +64,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     private val _homeUiEvent = MutableSharedFlow<HomeUiEvent>()
     val homeUiEvent = _homeUiEvent.asSharedFlow()
 
+    private var filesInternalState: List<FileInternalState> = listOf()
 
     fun checkActiveBranch() {
         viewModelScope.launch(Dispatchers.IO)
@@ -104,10 +129,53 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         _homeUiState.update { currentState -> currentState.copy(currentCommand = newCommand) }
     }
 
+    fun initializeFileStates() {
+        val filteredFiles =
+            workingDirectory.listDirectoryEntries().filter { !it.name.endsWith(".git") }
+        filesInternalState = filteredFiles.mapIndexed { fileIndex, filePath ->
+            FileInternalState(
+                path = filePath,
+                color = fileIndexToColorMap.getValue(fileIndex % fileIndexToColorMap.size)
+            )
+        }
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                filesUiState = filesInternalState.map { FileUiState(color = it.color) }
+            )
+        }
+    }
 
     private fun requestRefresh() {
         _homeUiState.update { currentState -> currentState.copy(needRefresh = true) }
     }
+
+    init {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    initializeFileStates()
+                }
+            } catch (e: IOException) {
+                Log.wtf(
+                    "HomeScreenViewModel_initialisation",
+                    "Could not read files in working directory initial error : ${e.message}"
+                )
+                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Could not read files in working directory"))
+            }
+        }
+    }
+
+    private val fileIndexToColorMap = mapOf(
+        0 to Blue,
+        1 to Orange,
+        2 to Green,
+        3 to Red,
+        4 to Purple,
+        5 to Brown,
+        6 to Pink,
+        7 to Black,
+        8 to Olive
+    )
 
     companion object {
         fun provideFactory(workingDirectory: Path): ViewModelProvider.Factory =

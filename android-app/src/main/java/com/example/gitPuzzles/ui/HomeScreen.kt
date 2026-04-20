@@ -51,14 +51,14 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val workingDirectory = remember { context.applicationContext.filesDir.toPath() }
+    val workingDirectory = remember { context.applicationContext.filesDir.resolve("mainGitFolder").toPath() }
     val viewModel: HomeViewModel =
         viewModel(factory = HomeViewModel.provideFactory(workingDirectory))
 
     val homeUiState by viewModel.homeUiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(homeUiState.needRefresh) {
-        viewModel.checkActiveBranch()
+        if (homeUiState.needRefresh) viewModel.checkActiveBranch()
     }
 
 
@@ -90,7 +90,12 @@ fun HomeScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.weight(1f))
+            FileSystemGrid(
+                filesColor = homeUiState.filesUiState.map { it.color },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
             SnackbarHost(hostState = snackbarHostState)
             if (openCommandChooser.value) {
                 CommandChooser(
