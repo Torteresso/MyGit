@@ -16,6 +16,7 @@ import gitLogic.CommitConfig
 import gitLogic.GitCommandsFunctions
 import gitLogic.InitConfig
 import gitLogic.JGit
+import gitLogic.StatusConfig
 import gitLogic.catFile
 import gitLogic.checkIgnore
 import gitLogic.checkout
@@ -26,7 +27,6 @@ import gitLogic.lsTree
 import gitLogic.remove
 import gitLogic.revParse
 import gitLogic.showRef
-import gitLogic.status
 import gitLogic.tag
 import java.io.IOException
 
@@ -184,14 +184,14 @@ class CheckIgnore : CliktCommand(name = "check-ignore") {
 }
 
 
-class Status : CliktCommand(name = "status") {
+class Status(private val gitCommands: GitCommandsFunctions) : CliktCommand(name = "status") {
 
 
     override fun help(context: Context) =
         "Show the working tree status."
 
     override fun run() {
-        status()
+        gitCommands.status(StatusConfig(repoDirectory = "."))
     }
 }
 
@@ -247,7 +247,7 @@ fun main(args: Array<String>) = try {
         .subcommands(RevParse())
         .subcommands(LsFiles())
         .subcommands(CheckIgnore())
-        .subcommands(Status())
+        .subcommands(Status(gitCommands))
         .subcommands(Remove())
         .subcommands(Add(gitCommands))
         .subcommands(Commit(gitCommands))

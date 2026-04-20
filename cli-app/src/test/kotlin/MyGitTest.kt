@@ -212,7 +212,7 @@ class MyGitTest {
         untrackedPresent: List<String> = emptyList(),
         untrackedAbsent: List<String> = emptyList()
     ) {
-        Status().test()
+        Status(gitCommands).test()
         val statusLines = outContent.toString().split("\n\n")
 
         assertEquals(

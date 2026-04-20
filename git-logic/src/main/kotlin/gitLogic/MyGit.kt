@@ -1362,6 +1362,13 @@ class MyGitFunctions : GitCommandsFunctions {
     override fun commit(config: CommitConfig) {
         commit(config.message)
     }
+
+    override fun status(config: StatusConfig): List<FileStatus> {
+        status()
+
+        // File Status not implemented in MyGit
+        return listOf()
+    }
 }
 
 fun catFile(type: String, objectName: String) {

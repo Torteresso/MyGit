@@ -3,7 +3,7 @@ package com.example.gitPuzzles.themlng
 import androidx.compose.ui.graphics.Color
 
 internal val Blue = Color(0xFF5E90C7)
-internal val Orange = Color(0xFFDA994A)
+internal val RedOrange = Color(0xFFD05808)
 internal val Green = Color(0xFF50B041)
 internal val Red = Color(0xFFC95454)
 internal val Purple = Color(0xFF6F4EBB)

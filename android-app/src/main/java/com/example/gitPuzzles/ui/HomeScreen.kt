@@ -91,7 +91,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             FileSystemGrid(
-                filesColor = homeUiState.filesUiState.map { it.color },
+                filesUiStates = homeUiState.filesUiState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
