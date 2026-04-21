@@ -51,7 +51,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val workingDirectory = remember { context.applicationContext.filesDir.resolve("mainGitFolder").toPath() }
+    val workingDirectory =
+        remember { context.applicationContext.filesDir.resolve("mainGitFolder").toPath() }
     val viewModel: HomeViewModel =
         viewModel(factory = HomeViewModel.provideFactory(workingDirectory))
 
@@ -87,8 +88,9 @@ fun HomeScreen(
             )
             FileSystemGrid(
                 filesUiStates = homeUiState.filesUiState,
-                areFileClickable = homeUiState.areFilesClickable,
-                onFileClick = { n  -> viewModel.selectFile(n)},
+                areFilesSelectable = homeUiState.areFilesSelectable,
+                onFileSelection = { n -> viewModel.selectFile(n) },
+                onFileClick = { n -> viewModel.focusFile(n) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)

@@ -45,6 +45,7 @@ private data class FileInternalState(
     var path: Path,
     var color: Color = White,
     var isSelected: Boolean = false,
+    var isFocused: Boolean = false,
     var status: List<FileStatus> = listOf()
 )
 
@@ -52,15 +53,19 @@ private data class FileInternalState(
 data class HomeUiState(
     val activeBranch: String? = null,
     val currentCommand: GitCommand = GitCommand.Init,
-    val areFilesClickable: Boolean = false,
+    val areFilesSelectable: Boolean = false,
     val filesUiState: List<FileUiState> = listOf()
 )
 
 data class FileUiState(
     val color: Color = White,
     val isSelected: Boolean = false,
-    val status: List<FileStatusUi> = listOf()
+    val isFocused: Boolean = false,
+    val status: List<FileStatusUi> = listOf(),
+    val block1: List<Float> = listOf(0.7f, 0.5f, 0.2f, 0.6f),
+    val block2: List<Float> = listOf(0.7f, 0.9f, 0.1f, 1.0f)
 )
+
 
 data class FileStatusUi(
     val statusCodeX: Pair<Char, Color> = Pair(' ', White),
@@ -203,7 +208,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         _homeUiState.update { currentState ->
             currentState.copy(
                 currentCommand = newCommand,
-                areFilesClickable = doesCommandNeedFiles(newCommand)
+                areFilesSelectable = doesCommandNeedFiles(newCommand)
             )
         }
     }
@@ -231,6 +236,23 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
                     if (fileIndex == fileNumber)
                         fileState.copy(isSelected = !fileState.isSelected) else fileState
+                }
+            )
+        }
+    }
+
+    fun focusFile(fileNumber: Int) {
+        filesInternalState.mapIndexed { fileIndex, fileState ->
+            if (fileIndex == fileNumber) fileState.isFocused = !fileState.isFocused
+            else fileState.isFocused = false
+        }
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
+                    if (fileIndex == fileNumber)
+                        fileState.copy(isFocused = !fileState.isFocused) else fileState.copy(
+                        isFocused = false
+                    )
                 }
             )
         }
