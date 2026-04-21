@@ -57,11 +57,6 @@ fun HomeScreen(
 
     val homeUiState by viewModel.homeUiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(homeUiState.needRefresh) {
-        if (homeUiState.needRefresh) viewModel.checkActiveBranch()
-    }
-
-
     val snackbarHostState = remember { SnackbarHostState() }
     val openCommandChooser = rememberSaveable { mutableStateOf(false) }
 
@@ -92,6 +87,8 @@ fun HomeScreen(
             )
             FileSystemGrid(
                 filesUiStates = homeUiState.filesUiState,
+                areFileClickable = homeUiState.areFilesClickable,
+                onFileClick = { n  -> viewModel.selectFile(n)},
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)

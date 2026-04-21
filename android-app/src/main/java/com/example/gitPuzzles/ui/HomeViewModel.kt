@@ -1,16 +1,7 @@
 package com.example.gitPuzzles.ui
 
 import android.util.Log
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Commit
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,7 +16,9 @@ import com.example.gitPuzzles.themlng.Pink
 import com.example.gitPuzzles.themlng.Purple
 import com.example.gitPuzzles.themlng.Red
 import com.example.gitPuzzles.themlng.RedOrange
+import com.example.gitPuzzles.themlng.Transparent
 import com.example.gitPuzzles.themlng.White
+import gitLogic.AddConfig
 import gitLogic.FileStatus
 import gitLogic.GitCommand
 import gitLogic.InitConfig
@@ -51,38 +44,55 @@ import kotlin.io.path.name
 private data class FileInternalState(
     var path: Path,
     var color: Color = White,
+    var isSelected: Boolean = false,
     var status: List<FileStatus> = listOf()
 )
 
 
 data class HomeUiState(
     val activeBranch: String? = null,
-    val needRefresh: Boolean = true,
     val currentCommand: GitCommand = GitCommand.Init,
+    val areFilesClickable: Boolean = false,
     val filesUiState: List<FileUiState> = listOf()
 )
 
 data class FileUiState(
     val color: Color = White,
+    val isSelected: Boolean = false,
     val status: List<FileStatusUi> = listOf()
 )
 
 data class FileStatusUi(
-    val color: Color = White,
-    val icon: ImageVector = Icons.Default.Commit,
+    val statusCodeX: Pair<Char, Color> = Pair(' ', White),
+    val statusCodeY: Pair<Char, Color> = Pair(' ', White),
     val label: String = "no status yet"
 )
 
+// @formatter:off
 fun FileStatus.toUi(): FileStatusUi = when (this) {
-    FileStatus.ADDED -> FileStatusUi(RedOrange, Icons.Default.Add, "Added")
-    FileStatus.MODIFIED_STAGED -> FileStatusUi(RedOrange, Icons.Default.Edit, "Staged")
-    FileStatus.MODIFIED_UNSTAGED -> FileStatusUi(RedOrange, Icons.Default.Edit, "Modified")
-    FileStatus.DELETED_STAGED -> FileStatusUi(RedOrange, Icons.Default.Delete, "Deleted")
-    FileStatus.DELETED_UNSTAGED -> FileStatusUi(RedOrange, Icons.Default.Delete, "Missing")
-    FileStatus.UNTRACKED -> FileStatusUi(RedOrange, Icons.Default.Close, "Untracked")
-    FileStatus.CONFLICT -> FileStatusUi(RedOrange, Icons.Default.Warning, "Conflict")
-    FileStatus.UNMODIFIED -> FileStatusUi(RedOrange, Icons.Default.Check, "Unmodified")
+    FileStatus.ADDED -> FileStatusUi(Pair('A', Green), Pair(' ', Transparent), "Added")
+    FileStatus.MODIFIED_STAGED -> FileStatusUi(Pair('M', Green), Pair(' ', Transparent), "Modified (staged)")
+    FileStatus.DELETED_STAGED -> FileStatusUi(Pair('D', Green), Pair(' ', Transparent), "Deleted (staged)")
+    FileStatus.MODIFIED_UNSTAGED -> FileStatusUi(Pair(' ', Transparent), Pair('M', Red), "Modified")
+    FileStatus.DELETED_UNSTAGED -> FileStatusUi(Pair(' ', Transparent), Pair('D', Red), "Deleted")
+    FileStatus.UNTRACKED -> FileStatusUi(Pair('?', Red), Pair('?', Red), "Untracked")
+    FileStatus.IGNORED -> FileStatusUi(Pair('!', Red), Pair('!', Red), "Ignored")
+    FileStatus.MODIFIED_STAGED_UNSTAGED -> FileStatusUi(Pair('M', Green), Pair('M', Red), "Modified (partially staged)")
+    FileStatus.ADDED_MODIFIED -> FileStatusUi(Pair('A', Green), Pair('M', Red), "Added (modified in worktree)")
+    FileStatus.ADDED_DELETED -> FileStatusUi(Pair('A', Green), Pair('D', Red), "Added (deleted in worktree)")
+    FileStatus.MODIFIED_STAGED_DELETED -> FileStatusUi(Pair('M', Green), Pair('D', Red), "Modified (deleted in worktree)")
+    FileStatus.DELETED_STAGED_MODIFIED -> FileStatusUi(Pair('D', Green), Pair('M', Red), "Deleted (modified in worktree)")
+    FileStatus.CONFLICT_BOTH_MODIFIED -> FileStatusUi(Pair('U', RedOrange), Pair('U', RedOrange), "Conflict (both modified)")
+    FileStatus.CONFLICT_BOTH_ADDED -> FileStatusUi(Pair('A', RedOrange), Pair('A', RedOrange), "Conflict (both added)")
+    FileStatus.CONFLICT_BOTH_DELETED -> FileStatusUi(Pair('D', RedOrange), Pair('D', RedOrange), "Conflict (both deleted)")
+    FileStatus.CONFLICT_ADDED_BY_US -> FileStatusUi(Pair('A', RedOrange), Pair('U', RedOrange), "Conflict (added by us)")
+    FileStatus.CONFLICT_ADDED_BY_THEM -> FileStatusUi(Pair('U', RedOrange), Pair('A', RedOrange), "Conflict (added by them)")
+    FileStatus.CONFLICT_DELETED_BY_US -> FileStatusUi(Pair('D', RedOrange), Pair('U', RedOrange), "Conflict (deleted by us)")
+    FileStatus.CONFLICT_DELETED_BY_THEM -> FileStatusUi(Pair('U', RedOrange), Pair('D', RedOrange), "Conflict (deleted by them)")
+    FileStatus.UNMODIFIED -> FileStatusUi(Pair(' ', Transparent), Pair(' ', Transparent), "Unmodified")
+    FileStatus.ERROR -> FileStatusUi(Pair('?', Red), Pair('!', Red), "Error")
 }
+// @formatter:on
 
 sealed class HomeUiEvent {
     data class ShowSnackBar(val message: String) : HomeUiEvent()
@@ -102,12 +112,9 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         {
             val repo = repoFind(workingDirectory)
             val activeBranch = if (repo == null) null else getActiveBranch(repo)
-
-            _homeUiState.update { currentState ->
-                if (_homeUiState.value.activeBranch != activeBranch) {
-                    currentState.copy(activeBranch = activeBranch, needRefresh = false)
-                } else {
-                    currentState.copy(needRefresh = false)
+            if (_homeUiState.value.activeBranch != activeBranch) {
+                _homeUiState.update { currentState ->
+                    currentState.copy(activeBranch = activeBranch)
                 }
             }
         }
@@ -117,7 +124,8 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         val gitDir = workingDirectory.resolve(".git")
         try {
             repoDelete(gitDir)
-            requestRefresh()
+            checkActiveBranch()
+            clearFilesStatus()
         } catch (e: FileNotFoundException) {
             Log.d("HomeScreen_DeleteButton", "Try to delete git dir at $gitDir, but ${e.message}")
             viewModelScope.launch {
@@ -139,6 +147,10 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO)
         {
             try {
+                var needToCheckActiveBranch = false
+                var needToClearStatus =
+                    (filesInternalState.isNotEmpty()
+                            && filesInternalState.first().status.isNotEmpty()) // only clear when status is ON
                 when (_homeUiState.value.currentCommand) {
 
 
@@ -149,6 +161,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                                 initialBranchName = "myBranch"
                             )
                         )
+                        needToCheckActiveBranch = true
                     }
 
                     is GitCommand.Status -> {
@@ -157,12 +170,23 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                                 repoDirectory = workingDirectory.toString(),
                                 filesToCheck = filesInternalState.map { it.path.toString() })
                         )
+                        needToClearStatus = false
                         updateFilesStatus(filesStatus)
                     }
 
+                    is GitCommand.Add -> JGit().add(
+                        AddConfig(
+                            repoDirectory = workingDirectory.toString(),
+                            filesToAdd = filesInternalState.filter { it.isSelected }
+                                .map { it.path.toString() }
+                        )
+                    )
+
                 }
 
-                requestRefresh()
+                if (needToCheckActiveBranch) checkActiveBranch()
+                if (needToClearStatus) clearFilesStatus()
+
             } catch (e: IOException) {
                 Log.d(
                     "HomeScreen_ExecuteCommand",
@@ -176,7 +200,12 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     fun changeCurrentCommand(newCommand: GitCommand) {
-        _homeUiState.update { currentState -> currentState.copy(currentCommand = newCommand) }
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                currentCommand = newCommand,
+                areFilesClickable = doesCommandNeedFiles(newCommand)
+            )
+        }
     }
 
     fun initializeFileStatus() {
@@ -195,6 +224,26 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
+    fun selectFile(fileNumber: Int) {
+        filesInternalState[fileNumber].apply { isSelected = !isSelected }
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
+                    if (fileIndex == fileNumber)
+                        fileState.copy(isSelected = !fileState.isSelected) else fileState
+                }
+            )
+        }
+    }
+
+    private fun doesCommandNeedFiles(command: GitCommand): Boolean {
+        return when (command) {
+            is GitCommand.Init -> false
+            is GitCommand.Status -> false
+            is GitCommand.Add -> true
+        }
+    }
+
     private suspend fun updateFilesStatus(filesStatus: List<FileStatus>) {
         if (filesInternalState.size != filesStatus.size) {
             Log.wtf(
@@ -203,8 +252,8 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             )
             _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Internal error: could not find files status"))
         } else {
-            filesInternalState.forEachIndexed { fileIndex, FileStatus ->
-                FileStatus.status = listOf(filesStatus[fileIndex])
+            filesInternalState.forEachIndexed { fileIndex, fileStatus ->
+                fileStatus.status = listOf(filesStatus[fileIndex])
             }
 
             _homeUiState.update { currentState ->
@@ -217,14 +266,22 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    private fun requestRefresh() {
-        _homeUiState.update { currentState -> currentState.copy(needRefresh = true) }
+    private fun clearFilesStatus() {
+        filesInternalState.forEach { it.status = listOf() }
+        _homeUiState.update { currentState ->
+            currentState.copy(filesUiState = currentState.filesUiState.map {
+                it.copy(
+                    status = listOf()
+                )
+            })
+        }
     }
 
     init {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
+                    checkActiveBranch()
                     initializeFileStatus()
                 }
             } catch (e: IOException) {
