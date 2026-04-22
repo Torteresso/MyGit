@@ -85,7 +85,7 @@ enum class BlockModificationFlag {
 
 object BlockConfig {
     const val MIN_LINE_NUMBER = 0
-    const val MAX_LINE_NUMBER = 20
+    const val MAX_LINE_NUMBER = 8
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
 }
 
@@ -231,7 +231,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    fun initializeFileStatus() {
+    fun initializeFileUiState() {
         val filteredFiles =
             workingDirectory.listDirectoryEntries().filter { !it.name.endsWith(".git") }
         filesInternalState = filteredFiles.mapIndexed { fileIndex, filePath ->
@@ -329,11 +329,10 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             var block1: List<Float>
             var block2: List<Float>
             filesInternalState[fileNumber].let {
-                val blocks = it.path.readText().split("#").filter { it.isNotEmpty() }
-                val test = blocks[0].split("\n")
-                block1 = blocks[0].split("\n").filter { it.isNotEmpty() }
+                val blocks = it.path.readText().split("#").filter { s -> s.isNotEmpty() }
+                block1 = blocks[0].split("\n").filter { s -> s.isNotEmpty() }
                     .map { blockValue -> blockValue.toFloat() }
-                block2 = blocks[1].split("\n").filter { it.isNotEmpty() }
+                block2 = blocks[1].split("\n").filter { s -> s.isNotEmpty() }
                     .map { blockValue -> blockValue.toFloat() }
                 it.block1 = block1.toMutableList()
                 it.block2 = block2.toMutableList()
@@ -395,11 +394,14 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             }
 
             _homeUiState.update { currentState ->
-                currentState.copy(filesUiState = filesInternalState.map {
-                    FileUiState(
-                        color = it.color,
-                        status = it.status.map { status -> status.toUi() })
-                })
+                currentState.copy(
+                    filesUiState =
+                        currentState.filesUiState.mapIndexed { fileIndex, fileState ->
+                            fileState.copy(
+                                status = filesInternalState[fileIndex].status.map { status -> status.toUi() }
+                            )
+                        }
+                )
             }
         }
     }
@@ -436,7 +438,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 withContext(Dispatchers.IO) {
                     createTestsFiles()
                     checkActiveBranch()
-                    initializeFileStatus()
+                    initializeFileUiState()
                     for (fileIndex in 0..<filesInternalState.size) {
                         checkFileBlocks(fileIndex)
                     }

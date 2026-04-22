@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gitPuzzles.numberToLetter
+import com.example.gitPuzzles.themlng.Black
 import com.example.gitPuzzles.themlng.Blue
 import com.example.gitPuzzles.themlng.Brown
 import com.example.gitPuzzles.themlng.Green
@@ -197,6 +199,7 @@ fun FileBlockAddAndRemoveButtons(
     blockNumber: Int,
     onButtonClick: (Int, Int, BlockModificationFlag) -> Unit
 ) {
+    val buttonSizeInWidthFraction = 0.175f
     FileBlockModificationButton(
         color = color,
         icon = Icons.Default.Remove,
@@ -207,7 +210,7 @@ fun FileBlockAddAndRemoveButtons(
         onButtonClick = onButtonClick,
         modifier =
             Modifier
-                .fillMaxWidth(0.15f)
+                .fillMaxWidth(buttonSizeInWidthFraction)
                 .aspectRatio(1f)
                 .offset {
                     IntOffset(
@@ -227,7 +230,7 @@ fun FileBlockAddAndRemoveButtons(
         modificationFlag = BlockModificationFlag.ADD_LINE,
         modifier =
             Modifier
-                .fillMaxWidth(0.15f)
+                .fillMaxWidth(buttonSizeInWidthFraction)
                 .aspectRatio(1f)
                 .offset {
                     IntOffset(
@@ -413,27 +416,37 @@ fun FileBlocks(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        SingleFileBlock(block = block1, color = color, modifier = Modifier.weight(1f))
-        SingleFileBlock(block = block2, color = color, modifier = Modifier.weight(1f))
+        SingleFileBlock(block = block1, color = color, modifier = Modifier.weight(1f).padding(6.dp))
+        SingleFileBlock(block = block2, color = color, modifier = Modifier.weight(1f).padding(6.dp))
     }
 }
 
 @Composable
 fun SingleFileBlock(block: List<Float>, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        block.forEach { length ->
-            Surface(
-                shape = RoundedCornerShape(
-                    topStart = 0.dp,
-                    topEnd = 0.dp,
-                    bottomStart = 0.dp,
-                    bottomEnd = 4.dp
-                ),
-                tonalElevation = 2.dp,
-                color = color, modifier = Modifier
-                    .fillMaxWidth(length)
-                    .height(8.dp)
-            ) {
+    BoxWithConstraints(modifier = modifier) {
+        val maxLineHeight = 8.dp
+        Column(modifier = Modifier.fillMaxSize()) {
+            block.forEachIndexed { lineIndex, lineLength ->
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = 0.dp,
+                        topEnd = 0.dp,
+                        bottomStart = 0.dp,
+                        bottomEnd = 4.dp
+                    ),
+                    tonalElevation = 2.dp,
+                    border = BorderStroke(0.1.dp, color = Black.copy(alpha = 0.5f)),
+                    color = color, modifier = Modifier
+                        .fillMaxWidth(lineLength)
+                        .then(
+                            if (this@BoxWithConstraints.maxHeight / block.size > maxLineHeight) Modifier.height(
+                                maxLineHeight
+                            )
+                            else Modifier.weight(1f)
+
+                        )
+                ) {
+                }
             }
         }
     }
