@@ -221,6 +221,8 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     fun changeCurrentCommand(newCommand: GitCommand) {
+        clearFilesSelection()
+
         _homeUiState.update { currentState ->
             currentState.copy(
                 currentCommand = newCommand,
@@ -360,6 +362,15 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             }
         }
 
+    }
+
+    private fun clearFilesSelection() {
+        filesInternalState.forEach { it.isSelected = false }
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                filesUiState = currentState.filesUiState.map { it.copy(isSelected = false) }
+            )
+        }
     }
 
 
