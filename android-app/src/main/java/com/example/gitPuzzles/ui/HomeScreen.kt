@@ -61,6 +61,9 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val openCommandChooser = rememberSaveable { mutableStateOf(false) }
 
+    val onCommandChooserDismissRequest = remember { { openCommandChooser.value = false } }
+    val onCommandButtonClick = remember { { openCommandChooser.value = true } }
+
     LaunchedEffect(Unit) {
         viewModel.homeUiEvent.collectLatest { event ->
             when (event) {
@@ -81,16 +84,15 @@ fun HomeScreen(
         {
             HomeScreenTopBar(
                 activeBranch = homeUiState.activeBranch,
-                onDeleteButtonClick = {
-                    viewModel.deleteGitRepository()
-                },
+                onDeleteButtonClick = viewModel::deleteGitRepository,
                 modifier = Modifier.fillMaxWidth()
             )
             FileSystemGrid(
                 filesUiStates = homeUiState.filesUiState,
                 areFilesSelectable = homeUiState.areFilesSelectable,
-                onFileSelection = { n -> viewModel.selectFile(n) },
-                onFileClick = { n -> viewModel.focusFile(n) },
+                onFileSelection = viewModel::selectFile,
+                onFileClick = viewModel::focusFile,
+                onBlockModificationButtonClick = viewModel::modifyFileBlock,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -98,12 +100,13 @@ fun HomeScreen(
             SnackbarHost(hostState = snackbarHostState)
             if (openCommandChooser.value) {
                 CommandChooser(
-                    onDismissRequest = { openCommandChooser.value = false },
-                    onCommandButtonClick = { command -> viewModel.changeCurrentCommand(command) })
+                    onDismissRequest = onCommandChooserDismissRequest,
+                    onCommandButtonClick = viewModel::changeCurrentCommand
+                )
             }
             HomeScreenBottomBar(
-                onCommandButtonClick = { openCommandChooser.value = true },
-                onExecuteButtonClick = { viewModel.executeCurrentCommand() },
+                onCommandButtonClick = onCommandButtonClick,
+                onExecuteButtonClick = viewModel::executeCurrentCommand,
                 currentCommand = homeUiState.currentCommand
             )
         }
@@ -157,10 +160,10 @@ fun HomeScreenBottomBar(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                TextButton(onClick = { onCommandButtonClick() }) {
+                TextButton(onClick = onCommandButtonClick) {
                     Text(text = "git ${currentCommand.name}")
                 }
-                IconButton(onClick = { onExecuteButtonClick() }) {
+                IconButton(onClick = onExecuteButtonClick) {
                     Icon(
                         painterResource(R.drawable.start_icon_24px),
                         contentDescription = "Execute the command"
@@ -179,7 +182,7 @@ fun CommandChooser(
     onCommandButtonClick: (GitCommand) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Dialog(onDismissRequest = { onDismissRequest() }) {
+    Dialog(onDismissRequest = onDismissRequest) {
         Card(
             modifier = modifier
                 .fillMaxWidth()

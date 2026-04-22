@@ -38,15 +38,21 @@ import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
+import kotlin.io.path.appendText
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+import kotlin.random.Random
 
 private data class FileInternalState(
     var path: Path,
     var color: Color = White,
     var isSelected: Boolean = false,
     var isFocused: Boolean = false,
-    var status: List<FileStatus> = listOf()
+    var status: List<FileStatus> = listOf(),
+    var block1: MutableList<Float> = mutableListOf(),
+    var block2: MutableList<Float> = mutableListOf()
 )
 
 
@@ -62,8 +68,8 @@ data class FileUiState(
     val isSelected: Boolean = false,
     val isFocused: Boolean = false,
     val status: List<FileStatusUi> = listOf(),
-    val block1: List<Float> = listOf(0.7f, 0.5f, 0.2f, 0.6f),
-    val block2: List<Float> = listOf(0.7f, 0.9f, 0.1f, 1.0f)
+    val block1: List<Float> = listOf(),
+    val block2: List<Float> = listOf()
 )
 
 
@@ -72,6 +78,16 @@ data class FileStatusUi(
     val statusCodeY: Pair<Char, Color> = Pair(' ', White),
     val label: String = "no status yet"
 )
+
+enum class BlockModificationFlag {
+    ADD_LINE, REMOVE_LINE
+}
+
+object BlockConfig {
+    const val MIN_LINE_NUMBER = 0
+    const val MAX_LINE_NUMBER = 20
+    val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
+}
 
 // @formatter:off
 fun FileStatus.toUi(): FileStatusUi = when (this) {
@@ -258,6 +274,95 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
+    fun modifyFileBlock(
+        fileNumber: Int,
+        blockNumber: Int,
+        modificationFlag: BlockModificationFlag
+    ) {
+        var blockToModify: MutableList<Float>
+
+        filesInternalState[fileNumber].let {
+            blockToModify = if (blockNumber == 1) it.block1 else it.block2
+
+            when (modificationFlag) {
+                BlockModificationFlag.ADD_LINE -> {
+                    if (blockToModify.size + 1 !in BlockConfig.VALID_LINE_RANGE) {
+                        viewModelScope.launch {
+                            _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
+                        }
+                        return
+                    } else
+                        blockToModify.add(0.1f + Random.nextFloat() * 0.9f)
+                }
+
+
+                BlockModificationFlag.REMOVE_LINE -> {
+                    if (blockToModify.size - 1 !in BlockConfig.VALID_LINE_RANGE) {
+                        viewModelScope.launch {
+                            _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Cannot remove line, min is ${BlockConfig.MIN_LINE_NUMBER}"))
+                        }
+                        return
+                    } else
+                        blockToModify.removeAt(blockToModify.lastIndex)
+                }
+            }
+        }
+        writeFileBlocks(fileNumber)
+
+        _homeUiState.update { currentState ->
+            currentState.copy(
+                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
+                    if (fileIndex == fileNumber) {
+                        if (blockNumber == 1) fileState.copy(block1 = blockToModify.toList())
+                        else fileState.copy(block2 = blockToModify.toList())
+                    } else fileState
+                }
+            )
+        }
+    }
+
+    private fun checkFileBlocks(fileNumber: Int) {
+        viewModelScope.launch(Dispatchers.IO)
+        {
+            var block1: List<Float>
+            var block2: List<Float>
+            filesInternalState[fileNumber].let {
+                val blocks = it.path.readText().split("#").filter { it.isNotEmpty() }
+                val test = blocks[0].split("\n")
+                block1 = blocks[0].split("\n").filter { it.isNotEmpty() }
+                    .map { blockValue -> blockValue.toFloat() }
+                block2 = blocks[1].split("\n").filter { it.isNotEmpty() }
+                    .map { blockValue -> blockValue.toFloat() }
+                it.block1 = block1.toMutableList()
+                it.block2 = block2.toMutableList()
+            }
+
+            _homeUiState.update { currentState ->
+                currentState.copy(
+                    filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
+                        if (fileIndex == fileNumber) {
+                            fileState.copy(block1 = block1, block2 = block2)
+                        } else fileState
+                    }
+                )
+            }
+        }
+    }
+
+    private fun writeFileBlocks(fileNumber: Int) {
+        viewModelScope.launch(Dispatchers.IO)
+        {
+            filesInternalState[fileNumber].let {
+                it.path.writeText("#\n")
+                it.block1.forEach { blockValue -> it.path.appendText("$blockValue\n") }
+                it.path.appendText("#\n")
+                it.block2.forEach { blockValue -> it.path.appendText("$blockValue\n") }
+            }
+        }
+
+    }
+
+
     private fun doesCommandNeedFiles(command: GitCommand): Boolean {
         return when (command) {
             is GitCommand.Init -> false
@@ -299,12 +404,31 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
+    private fun createTestsFiles() {
+        if (workingDirectory.listDirectoryEntries().size <= 1) {
+            workingDirectory.resolve("test.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test1.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test2.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test3.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test4.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test5.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test6.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test7.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test8.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test9.txt").writeText("#\n0.7\n#\n0.7\n")
+        }
+    }
+
     init {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
+                    createTestsFiles()
                     checkActiveBranch()
                     initializeFileStatus()
+                    for (fileIndex in 0..<filesInternalState.size) {
+                        checkFileBlocks(fileIndex)
+                    }
                 }
             } catch (e: IOException) {
                 Log.wtf(

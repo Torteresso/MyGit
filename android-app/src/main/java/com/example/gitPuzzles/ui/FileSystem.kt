@@ -65,6 +65,7 @@ fun FileSystemGrid(
     areFilesSelectable: Boolean,
     onFileSelection: (Int) -> Unit,
     onFileClick: (Int) -> Unit,
+    onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
@@ -79,6 +80,7 @@ fun FileSystemGrid(
                 isFileSelectable = areFilesSelectable,
                 onFileSelection = onFileSelection,
                 onFileClick = onFileClick,
+                onBlockModificationButtonClick = onBlockModificationButtonClick,
                 modifier = Modifier
                     .aspectRatio(0.8f)
                     .padding(4.dp)
@@ -87,7 +89,6 @@ fun FileSystemGrid(
     }
 }
 
-
 @Composable
 fun FileCard(
     fileNumber: Int,
@@ -95,6 +96,7 @@ fun FileCard(
     isFileSelectable: Boolean,
     onFileSelection: (Int) -> Unit,
     onFileClick: (Int) -> Unit,
+    onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> (Unit),
     modifier: Modifier = Modifier,
 ) {
 
@@ -144,7 +146,10 @@ fun FileCard(
                 cardInteriorSurfaceSize = cardInteriorSurfaceSize,
                 cardInteriorSurfaceOffset = cardInteriorSurfaceOffset,
                 blockButtonsCircleSize = blockButtonsCircleSize,
-                heightPositionFraction = fileBlocksPositionInFractionHeight
+                heightPositionFraction = fileBlocksPositionInFractionHeight,
+                fileNumber = fileNumber,
+                blockNumber = 1,
+                onButtonClick = onBlockModificationButtonClick
             )
             FileBlockAddAndRemoveButtons(
                 color = fileUiState.color,
@@ -154,7 +159,10 @@ fun FileCard(
                 heightPositionFraction =
                     (fileBlocksPositionInFractionHeight +
                             (1 - fileBlocksBottomPaddingInFractionHeight -
-                                    fileBlocksPositionInFractionHeight) / 2)
+                                    fileBlocksPositionInFractionHeight) / 2),
+                fileNumber = fileNumber,
+                blockNumber = 2,
+                onButtonClick = onBlockModificationButtonClick
             )
 
         }
@@ -184,13 +192,19 @@ fun FileCard(
 fun FileBlockAddAndRemoveButtons(
     color: Color, cardInteriorSurfaceOffset: Offset,
     blockButtonsCircleSize: IntSize, cardInteriorSurfaceSize: IntSize,
-    heightPositionFraction: Float
+    heightPositionFraction: Float,
+    fileNumber: Int,
+    blockNumber: Int,
+    onButtonClick: (Int, Int, BlockModificationFlag) -> Unit
 ) {
     FileBlockModificationButton(
         color = color,
         icon = Icons.Default.Remove,
         iconDescription = "Remove last block",
-        onButtonClick = {},
+        fileNumber = fileNumber,
+        blockNumber = blockNumber,
+        modificationFlag = BlockModificationFlag.REMOVE_LINE,
+        onButtonClick = onButtonClick,
         modifier =
             Modifier
                 .fillMaxWidth(0.15f)
@@ -207,7 +221,10 @@ fun FileBlockAddAndRemoveButtons(
         color = color,
         icon = Icons.Default.Add,
         iconDescription = "Add new block",
-        onButtonClick = {},
+        onButtonClick = onButtonClick,
+        fileNumber = fileNumber,
+        blockNumber = blockNumber,
+        modificationFlag = BlockModificationFlag.ADD_LINE,
         modifier =
             Modifier
                 .fillMaxWidth(0.15f)
@@ -228,7 +245,10 @@ fun FileBlockModificationButton(
     color: Color,
     icon: ImageVector,
     iconDescription: String,
-    onButtonClick: () -> Unit,
+    fileNumber: Int,
+    blockNumber: Int,
+    modificationFlag: BlockModificationFlag,
+    onButtonClick: (Int, Int, BlockModificationFlag) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -236,7 +256,7 @@ fun FileBlockModificationButton(
         color = color,
         modifier = modifier
 
-            .clickable(onClick = { onButtonClick() })
+            .clickable(onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
 
     ) {
         Icon(imageVector = icon, contentDescription = iconDescription)
@@ -458,6 +478,7 @@ fun FileSystemGridPreview() {
         areFilesSelectable = true,
         onFileSelection = {},
         onFileClick = {},
+        onBlockModificationButtonClick = { _, _, _ -> },
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -478,7 +499,8 @@ fun FileCardPreview() {
             ),
         isFileSelectable = true,
         onFileSelection = {},
-        onFileClick = {}
+        onFileClick = {},
+        onBlockModificationButtonClick = { _, _, _ -> }
     )
 }
 
