@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,7 +75,7 @@ fun HomeScreen(
         }
     }
 
-    Surface(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -97,7 +98,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .weight(1f)
             )
-            SnackbarHost(hostState = snackbarHostState)
+
             if (openCommandChooser.value) {
                 CommandChooser(
                     onDismissRequest = onCommandChooserDismissRequest,
@@ -110,6 +111,10 @@ fun HomeScreen(
                 currentCommand = homeUiState.currentCommand
             )
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y=(-100).dp)
+        )
     }
 }
 
