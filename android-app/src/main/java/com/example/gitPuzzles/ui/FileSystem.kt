@@ -103,11 +103,11 @@ fun FileCard(
 ) {
 
     var cardInteriorSurfaceOffset by remember { mutableStateOf(Offset.Zero) }
-    var cardInteriorSurfaceSize by remember { mutableStateOf(IntSize.Zero) }
-    var nameCircleSize by remember { mutableStateOf(IntSize.Zero) }
-    var blockButtonsCircleSize by remember { mutableStateOf(IntSize.Zero) }
+    var cardInteriorSurfaceSize by remember { mutableStateOf(IntSize(1, 1)) }
+    var nameCircleSize by remember { mutableStateOf(IntSize(1, 1)) }
+    var blockButtonsCircleSize by remember { mutableStateOf(IntSize(1, 1) )}
 
-    val fileBlocksPositionInFractionHeight = 0.35f
+    val fileBlocksPositionInFractionHeight = 0.3f
     val fileBlocksBottomPaddingInFractionHeight = 0.05f
 
     Box(modifier = modifier.fillMaxSize())
