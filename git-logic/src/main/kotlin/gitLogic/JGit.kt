@@ -16,6 +16,8 @@ class JGit : GitCommandsFunctions {
     }
 
     override fun add(config: AddConfig) {
+        if (config.filesToAdd.isEmpty()) return
+
         val filesToAdd = config.filesToAdd.relativizeFilesNames(config.repoDirectory)
         Git.open(File(config.repoDirectory)).use {
             it.add()
@@ -34,6 +36,8 @@ class JGit : GitCommandsFunctions {
 
     // Do not print for CLI-APP
     override fun status(config: StatusConfig): List<FileStatus> {
+
+        if (config.filesToCheck != null && config.filesToCheck.isEmpty()) return listOf()
 
         val relativePathToCheck = config.filesToCheck?.relativizeFilesNames(config.repoDirectory)
         Git.open(File(config.repoDirectory)).use {
