@@ -90,9 +90,7 @@ fun HomeScreen(
             )
             FileSystemGrid(
                 filesUiStates = homeUiState.filesUiState,
-                areFilesSelectable = homeUiState.areFilesSelectable,
-                onFileSelection = viewModel::selectFile,
-                onFileClick = viewModel::focusFile,
+                onFileClick = viewModel::onFileInteraction,
                 onBlockModificationButtonClick = viewModel::modifyFileBlock,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -113,7 +111,9 @@ fun HomeScreen(
         }
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).offset(y=(-100).dp)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = (-100).dp)
         )
     }
 }

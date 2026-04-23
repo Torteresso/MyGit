@@ -54,8 +54,8 @@ import com.example.gitPuzzles.numberToLetter
 import com.example.gitPuzzles.themlng.Black
 import com.example.gitPuzzles.themlng.Blue
 import com.example.gitPuzzles.themlng.Brown
+import com.example.gitPuzzles.themlng.DarkGreen
 import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Purple
 import com.example.gitPuzzles.themlng.StatusBackgroundColor
 import com.example.gitPuzzles.themlng.Transparent
 import com.example.gitPuzzles.themlng.White
@@ -64,8 +64,6 @@ import gitLogic.FileStatus
 @Composable
 fun FileSystemGrid(
     filesUiStates: List<FileUiState>,
-    areFilesSelectable: Boolean,
-    onFileSelection: (Int) -> Unit,
     onFileClick: (Int) -> Unit,
     onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> Unit,
     modifier: Modifier = Modifier
@@ -79,8 +77,6 @@ fun FileSystemGrid(
             FileCard(
                 fileNumber = fileNumber,
                 fileUiState = filesUiStates[fileNumber],
-                isFileSelectable = areFilesSelectable,
-                onFileSelection = onFileSelection,
                 onFileClick = onFileClick,
                 onBlockModificationButtonClick = onBlockModificationButtonClick,
                 modifier = Modifier
@@ -95,8 +91,6 @@ fun FileSystemGrid(
 fun FileCard(
     fileNumber: Int,
     fileUiState: FileUiState,
-    isFileSelectable: Boolean,
-    onFileSelection: (Int) -> Unit,
     onFileClick: (Int) -> Unit,
     onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> (Unit),
     modifier: Modifier = Modifier,
@@ -105,7 +99,7 @@ fun FileCard(
     var cardInteriorSurfaceOffset by remember { mutableStateOf(Offset.Zero) }
     var cardInteriorSurfaceSize by remember { mutableStateOf(IntSize(1, 1)) }
     var nameCircleSize by remember { mutableStateOf(IntSize(1, 1)) }
-    var blockButtonsCircleSize by remember { mutableStateOf(IntSize(1, 1) )}
+    var blockButtonsCircleSize by remember { mutableStateOf(IntSize(1, 1)) }
 
     val fileBlocksPositionInFractionHeight = 0.3f
     val fileBlocksBottomPaddingInFractionHeight = 0.05f
@@ -131,7 +125,7 @@ fun FileCard(
 
         )
 
-        if (fileUiState.isFocused) {
+        if (fileUiState.interactionState == FileInteractionState.FOCUSED) {
             // For measurement only
             val buttonSizeWidthFraction = 0.15f
             Box(
@@ -172,8 +166,6 @@ fun FileCard(
         FileCardNameIndicator(
             fileUiState = fileUiState,
             fileNumber = fileNumber,
-            isFileSelectable = isFileSelectable,
-            onFileSelection = onFileSelection,
             modifier = Modifier
                 .fillMaxWidth(0.35f)
                 .aspectRatio(1f)
@@ -271,16 +263,12 @@ fun FileBlockModificationButton(
 fun FileCardNameIndicator(
     fileUiState: FileUiState,
     fileNumber: Int,
-    isFileSelectable: Boolean,
-    onFileSelection: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         shape = CircleShape,
         color = fileUiState.color,
         modifier = modifier
-            .clickable(enabled = isFileSelectable, onClick = { onFileSelection(fileNumber) })
-
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
@@ -305,19 +293,35 @@ fun FileCardInterior(
     @SuppressLint("ModifierParameter") fileStatusBadgeModifier: Modifier,
     modifier: Modifier = Modifier,
 ) {
-    val fileBorderColor = if (fileUiState.isSelected) Green else Color.Gray
+    val fileBorderColor = remember(fileUiState.interactionState, fileUiState.color) {
+        when (fileUiState.interactionState) {
+            FileInteractionState.SELECTED -> {
+
+                Brush.linearGradient(
+                    listOf(
+                        Green,
+                        DarkGreen
+                    )
+                )
+            }
+
+            FileInteractionState.FOCUSED -> SolidColor(fileUiState.color)
+
+            FileInteractionState.IDLE -> SolidColor(Color.Gray)
+        }
+    }
 
     val fileBackgroundBrush = remember(
-        fileUiState.isFocused,
+        fileUiState.interactionState,
         fileUiState.color,
         gradientSize
     ) {
-        if (fileUiState.isFocused) {
+        if (fileUiState.interactionState == FileInteractionState.FOCUSED) {
             Brush.radialGradient(
                 colors = listOf(
-                    fileUiState.color.copy(alpha = 0.3f),
+                    Color.Transparent,
                     fileUiState.color.copy(alpha = 0.15f),
-                    Color.Transparent
+                    fileUiState.color.copy(alpha = 0.3f),
                 ),
                 center = Offset.Unspecified,
                 radius = gradientSize
@@ -416,8 +420,16 @@ fun FileBlocks(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        SingleFileBlock(block = block1, color = color, modifier = Modifier.weight(1f).padding(6.dp))
-        SingleFileBlock(block = block2, color = color, modifier = Modifier.weight(1f).padding(6.dp))
+        SingleFileBlock(
+            block = block1, color = color, modifier = Modifier
+                .weight(1f)
+                .padding(6.dp)
+        )
+        SingleFileBlock(
+            block = block2, color = color, modifier = Modifier
+                .weight(1f)
+                .padding(6.dp)
+        )
     }
 }
 
@@ -462,15 +474,15 @@ fun FileSystemGridPreview() {
                 status = listOf(
 
                     FileStatus.ADDED.toUi(),
-                ), isFocused = true
+                ), interactionState = FileInteractionState.FOCUSED
             ),
             FileUiState(
                 color = Brown, status = listOf(
 
                     FileStatus.ADDED.toUi(),
                     FileStatus.MODIFIED_STAGED_DELETED.toUi(),
-                ),
-                isSelected = true
+                ), interactionState = FileInteractionState.SELECTED
+
             ),
             FileUiState(
                 color = Green,
@@ -479,17 +491,7 @@ fun FileSystemGridPreview() {
                     FileStatus.DELETED_STAGED.toUi(),
                 )
             ),
-            FileUiState(
-                color = Purple,
-                status = listOf(
-                    FileStatus.MODIFIED_STAGED_UNSTAGED.toUi(),
-                ),
-                isSelected = true,
-                isFocused = true
-            )
         ),
-        areFilesSelectable = true,
-        onFileSelection = {},
         onFileClick = {},
         onBlockModificationButtonClick = { _, _, _ -> },
         modifier = Modifier.fillMaxWidth()
@@ -510,8 +512,6 @@ fun FileCardPreview() {
                 ), block1 = listOf(1.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f),
                 block2 = listOf(0.8f, 0.2f, 0.1f)
             ),
-        isFileSelectable = true,
-        onFileSelection = {},
         onFileClick = {},
         onBlockModificationButtonClick = { _, _, _ -> }
     )
