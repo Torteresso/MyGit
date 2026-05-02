@@ -19,6 +19,7 @@ import com.example.gitPuzzles.themlng.Red
 import com.example.gitPuzzles.themlng.RedOrange
 import com.example.gitPuzzles.themlng.Transparent
 import com.example.gitPuzzles.themlng.White
+import com.example.gitPuzzles.ui.HomeUiEvent.ShowSnackBar
 import gitLogic.AddConfig
 import gitLogic.FileStatus
 import gitLogic.GitCommand
@@ -31,8 +32,10 @@ import gitLogic.repoFind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,21 +49,57 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.random.Random
 
-private data class FileInternalState(
-    var path: Path,
-    var color: Color = White,
-    var interactionState: FileInteractionState = FileInteractionState.IDLE,
-    var status: List<FileStatus> = listOf(),
-    var block1: MutableList<Float> = mutableListOf(),
-    var block2: MutableList<Float> = mutableListOf()
-)
 
+private data class HomeState(
+    val activeBranch: String? = null,
+    val currentCommand: GitCommand? = null,
+    val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_IDLE,
+    val filesState: List<FileState> = listOf()
+)
 
 data class HomeUiState(
     val activeBranch: String? = null,
-    val currentCommand: GitCommand = GitCommand.Init,
+    val currentCommand: GitCommand? = null,
     val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_IDLE,
     val filesUiState: List<FileUiState> = listOf()
+)
+
+private fun HomeState.toUiState(): HomeUiState {
+    return HomeUiState(
+        activeBranch = this.activeBranch,
+        currentCommand = this.currentCommand,
+        filesInteractionMode = this.filesInteractionMode,
+        filesUiState = this.filesState.map { it.toUiState() }
+    )
+}
+
+private val fileIndexToColorMap = mapOf(
+    0 to Blue,
+    1 to Orange,
+    2 to Red,
+    3 to Purple,
+    4 to Brown,
+    5 to Pink,
+    6 to Black,
+    7 to Olive
+)
+
+
+enum class FilesInteractionMode {
+    ARE_SELECTABLE, ARE_FOCUSABLE, ARE_IDLE
+}
+
+enum class FileInteractionState {
+    SELECTED, FOCUSED, IDLE
+}
+
+private data class FileState(
+    val path: Path,
+    val fileIndex: Int,
+    val interactionState: FileInteractionState = FileInteractionState.IDLE,
+    val status: List<FileStatus> = listOf(),
+    val block1: List<Float> = listOf(),
+    val block2: List<Float> = listOf()
 )
 
 data class FileUiState(
@@ -71,19 +110,14 @@ data class FileUiState(
     val block2: List<Float> = listOf()
 )
 
-
-data class FileStatusUi(
-    val statusCodeX: Pair<Char, Color> = Pair(' ', White),
-    val statusCodeY: Pair<Char, Color> = Pair(' ', White),
-    val label: String = "no status yet"
-)
-
-enum class FilesInteractionMode {
-    ARE_SELECTABLE, ARE_FOCUSABLE, ARE_IDLE
-}
-
-enum class FileInteractionState {
-    SELECTED, FOCUSED, IDLE
+private fun FileState.toUiState(): FileUiState {
+    return FileUiState(
+        color = fileIndexToColorMap.getValue(this.fileIndex % fileIndexToColorMap.size),
+        interactionState = this.interactionState,
+        status = this.status.map { it.toUi() },
+        block1 = this.block1,
+        block2 = this.block2
+    )
 }
 
 enum class BlockModificationFlag {
@@ -95,6 +129,12 @@ object BlockConfig {
     const val MAX_LINE_NUMBER = 8
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
 }
+
+data class FileStatusUi(
+    val statusCodeX: Pair<Char, Color> = Pair(' ', White),
+    val statusCodeY: Pair<Char, Color> = Pair(' ', White),
+    val label: String = "no status yet"
+)
 
 // @formatter:off
 fun FileStatus.toUi(): FileStatusUi = when (this) {
@@ -127,21 +167,26 @@ sealed class HomeUiEvent {
 }
 
 class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
-    private val _homeUiState = MutableStateFlow(HomeUiState())
-    val homeUiState = _homeUiState.asStateFlow()
+    private val _homeState = MutableStateFlow(HomeState())
+    val homeUiState = _homeState
+        .map { it.toUiState() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = HomeUiState()
+        )
 
     private val _homeUiEvent = MutableSharedFlow<HomeUiEvent>()
     val homeUiEvent = _homeUiEvent.asSharedFlow()
 
-    private var filesInternalState: List<FileInternalState> = listOf()
 
     fun checkActiveBranch() {
         viewModelScope.launch(Dispatchers.IO)
         {
             val repo = repoFind(workingDirectory)
             val activeBranch = if (repo == null) null else getActiveBranch(repo)
-            if (_homeUiState.value.activeBranch != activeBranch) {
-                _homeUiState.update { currentState ->
+            if (_homeState.value.activeBranch != activeBranch) {
+                _homeState.update { currentState ->
                     currentState.copy(activeBranch = activeBranch)
                 }
             }
@@ -172,14 +217,15 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     fun executeCurrentCommand() {
+        val command = _homeState.value.currentCommand ?: return
         viewModelScope.launch(Dispatchers.IO)
         {
             try {
                 var needToCheckActiveBranch = false
                 var needToClearStatus =
-                    (filesInternalState.isNotEmpty()
-                            && filesInternalState.first().status.isNotEmpty()) // only clear when status is ON
-                when (_homeUiState.value.currentCommand) {
+                    (_homeState.value.filesState.isNotEmpty()
+                            && _homeState.value.filesState.first().status.isNotEmpty()) // only clear when status is ON
+                when (command) {
 
 
                     is GitCommand.Init -> {
@@ -196,24 +242,34 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                         val filesStatus = JGit().status(
                             StatusConfig(
                                 repoDirectory = workingDirectory.toString(),
-                                filesToCheck = filesInternalState.map { it.path.toString() })
+                                filesToCheck = _homeState.value.filesState.map { it.path.toString() })
                         )
                         needToClearStatus = false
                         updateFilesStatus(filesStatus)
                     }
 
-                    is GitCommand.Add -> JGit().add(
-                        AddConfig(
-                            repoDirectory = workingDirectory.toString(),
-                            filesToAdd = filesInternalState.filter { it.interactionState == FileInteractionState.SELECTED }
+                    is GitCommand.Add -> {
+                        val filesToAdd =
+                            _homeState.value.filesState.filter { it.interactionState == FileInteractionState.SELECTED }
                                 .map { it.path.toString() }
-                        )
-                    )
 
+                        if (filesToAdd.isEmpty()) {
+                            _homeUiEvent.emit(ShowSnackBar("Select at least one file to add"))
+                        } else {
+                            JGit().add(
+                                AddConfig(
+                                    repoDirectory = workingDirectory.toString(),
+                                    filesToAdd = filesToAdd
+                                )
+                            )
+                        }
+
+                    }
                 }
 
                 if (needToCheckActiveBranch) checkActiveBranch()
                 if (needToClearStatus) clearFilesStatus()
+                resetFilesInteractionState()
 
             } catch (e: IOException) {
                 Log.d(
@@ -227,10 +283,10 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    fun changeCurrentCommand(newCommand: GitCommand) {
+    fun changeCurrentCommand(newCommand: GitCommand?) {
         resetFilesInteractionState()
 
-        _homeUiState.update { currentState ->
+        _homeState.update { currentState ->
             currentState.copy(
                 currentCommand = newCommand,
                 filesInteractionMode = getFilesInteractionModeFromCommand(newCommand)
@@ -238,24 +294,21 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    fun initializeFileUiState() {
+    fun initializeFileState() {
         val filteredFiles =
             workingDirectory.listDirectoryEntries().filter { !it.name.endsWith(".git") }
-        filesInternalState = filteredFiles.mapIndexed { fileIndex, filePath ->
-            FileInternalState(
-                path = filePath,
-                color = fileIndexToColorMap.getValue(fileIndex % fileIndexToColorMap.size)
-            )
-        }
-        _homeUiState.update { currentState ->
-            currentState.copy(
-                filesUiState = filesInternalState.map { FileUiState(color = it.color) }
-            )
+        _homeState.update { current ->
+            current.copy(filesState = filteredFiles.mapIndexed { fileIndex, filePath ->
+                FileState(
+                    path = filePath,
+                    fileIndex = fileIndex
+                )
+            })
         }
     }
 
     fun onFileInteraction(fileNumber: Int) {
-        when (_homeUiState.value.filesInteractionMode) {
+        when (_homeState.value.filesInteractionMode) {
             FilesInteractionMode.ARE_IDLE -> return
             FilesInteractionMode.ARE_SELECTABLE -> selectFile(fileNumber)
             FilesInteractionMode.ARE_FOCUSABLE -> focusFile(fileNumber)
@@ -268,12 +321,13 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         blockNumber: Int,
         modificationFlag: BlockModificationFlag
     ) {
-        lateinit var blockToModify: MutableList<Float>
+        val blockToModify =
+            if (blockNumber == 1) _homeState.value.filesState[fileNumber].block1
+            else _homeState.value.filesState[fileNumber].block2
 
-        filesInternalState[fileNumber].let {
-            blockToModify = if (blockNumber == 1) it.block1 else it.block2
-
+        val updatedBlock =
             when (modificationFlag) {
+
                 BlockModificationFlag.ADD_LINE -> {
                     if (blockToModify.size + 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
@@ -281,9 +335,8 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                         }
                         return
                     } else
-                        blockToModify.add(0.1f + Random.nextFloat() * 0.9f)
+                        blockToModify + (0.1f + Random.nextFloat() * 0.9f)
                 }
-
 
                 BlockModificationFlag.REMOVE_LINE -> {
                     if (blockToModify.size - 1 !in BlockConfig.VALID_LINE_RANGE) {
@@ -292,82 +345,76 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                         }
                         return
                     } else
-                        blockToModify.removeAt(blockToModify.lastIndex)
+                        blockToModify.dropLast(1)
                 }
             }
-        }
-        writeFileBlocks(fileNumber)
+        _homeState.update { currentState ->
+            currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileState ->
+                if (fileIndex == fileNumber) {
 
-        _homeUiState.update { currentState ->
-            currentState.copy(
-                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                    if (fileIndex == fileNumber) {
-                        if (blockNumber == 1) fileState.copy(block1 = blockToModify.toList())
-                        else fileState.copy(block2 = blockToModify.toList())
-                    } else fileState
-                }
+                    if (blockNumber == 1) fileState.copy(block1 = updatedBlock)
+                    else fileState.copy(block2 = updatedBlock)
+                } else fileState
+
+            }
             )
         }
+        writeFileBlocks(fileNumber)
     }
 
     private fun checkFileBlocks(fileNumber: Int) {
+
         viewModelScope.launch(Dispatchers.IO)
         {
-            var block1: List<Float>
-            var block2: List<Float>
-            filesInternalState[fileNumber].let {
-                val blocks = it.path.readText().split("#").filter { s -> s.isNotEmpty() }
-                block1 = blocks[0].split("\n").filter { s -> s.isNotEmpty() }
-                    .map { blockValue -> blockValue.toFloat() }
-                block2 = blocks[1].split("\n").filter { s -> s.isNotEmpty() }
-                    .map { blockValue -> blockValue.toFloat() }
-                it.block1 = block1.toMutableList()
-                it.block2 = block2.toMutableList()
-            }
-
-            _homeUiState.update { currentState ->
-                currentState.copy(
-                    filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                        if (fileIndex == fileNumber) {
-                            fileState.copy(block1 = block1, block2 = block2)
-                        } else fileState
-                    }
+            val blocks =
+                _homeState.value.filesState[fileNumber].path.readText().split("#")
+                    .filter { s -> s.isNotEmpty() }
+            val block1 = blocks[0].split("\n").filter { s -> s.isNotEmpty() }
+                .map { blockValue -> blockValue.toFloat() }
+            val block2 = blocks[1].split("\n").filter { s -> s.isNotEmpty() }
+                .map { blockValue -> blockValue.toFloat() }
+            _homeState.update { currentState ->
+                currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileState ->
+                    if (fileIndex == fileNumber) {
+                        fileState.copy(block1 = block1, block2 = block2)
+                    } else fileState
+                }
                 )
             }
         }
+
     }
 
     private fun selectFile(fileNumber: Int) {
-        filesInternalState[fileNumber].apply {
-            interactionState =
-                if (interactionState == FileInteractionState.SELECTED) FileInteractionState.IDLE else FileInteractionState.SELECTED
-        }
-        _homeUiState.update { currentState ->
-            currentState.copy(
-                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                    if (fileIndex == fileNumber)
-                        fileState.copy(interactionState = filesInternalState[fileIndex].interactionState) else fileState
-                }
-            )
+        _homeState.update { currentState ->
+            currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileState ->
+                if (fileIndex == fileNumber) {
+                    fileState.copy(
+                        interactionState =
+                            if (fileState.interactionState == FileInteractionState.SELECTED) FileInteractionState.IDLE else FileInteractionState.SELECTED
+                    )
+                } else fileState
+
+            })
         }
     }
 
     private fun focusFile(fileNumber: Int) {
-        filesInternalState.mapIndexed { fileIndex, fileState ->
-            if (fileIndex == fileNumber) {
-                fileState.interactionState =
-                    if (fileState.interactionState == FileInteractionState.FOCUSED) FileInteractionState.IDLE else FileInteractionState.FOCUSED
-            } else {
-                if (fileState.interactionState == FileInteractionState.FOCUSED) fileState.interactionState =
-                    FileInteractionState.IDLE else fileState
+        _homeState.update { currentState ->
+            currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileState ->
+                if (fileIndex == fileNumber) {
+                    fileState.copy(
+                        interactionState =
+                            if (fileState.interactionState == FileInteractionState.FOCUSED) FileInteractionState.IDLE else FileInteractionState.FOCUSED
+                    )
+                } else {
+                    if (fileState.interactionState == FileInteractionState.FOCUSED) fileState.copy(
+                        interactionState =
+                            FileInteractionState.IDLE
+                    ) else fileState
 
-            }
-        }
-        _homeUiState.update { currentState ->
-            currentState.copy(
-                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                    fileState.copy(interactionState = filesInternalState[fileIndex].interactionState)
                 }
+            }
             )
         }
     }
@@ -375,7 +422,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     private fun writeFileBlocks(fileNumber: Int) {
         viewModelScope.launch(Dispatchers.IO)
         {
-            filesInternalState[fileNumber].let {
+            _homeState.value.filesState[fileNumber].let {
                 it.path.writeText("#\n")
                 it.block1.forEach { blockValue -> it.path.appendText("$blockValue\n") }
                 it.path.appendText("#\n")
@@ -386,59 +433,47 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     private fun resetFilesInteractionState() {
-        filesInternalState.forEach {
-            it.interactionState =
-                FileInteractionState.IDLE
-        }
-        _homeUiState.update { currentState ->
-            currentState.copy(
-                filesUiState = currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                    fileState.copy(
-                        interactionState = FileInteractionState.IDLE
-                    )
-                }
+        _homeState.update { currentState ->
+            currentState.copy(filesState = currentState.filesState.map {
+                it.copy(
+                    interactionState =
+                        FileInteractionState.IDLE
+                )
+            }
             )
         }
     }
 
 
-    private fun getFilesInteractionModeFromCommand(command: GitCommand): FilesInteractionMode {
+    private fun getFilesInteractionModeFromCommand(command: GitCommand?): FilesInteractionMode {
         return when (command) {
             is GitCommand.Init -> FilesInteractionMode.ARE_FOCUSABLE
             is GitCommand.Status -> FilesInteractionMode.ARE_FOCUSABLE
             is GitCommand.Add -> FilesInteractionMode.ARE_SELECTABLE
+            null -> FilesInteractionMode.ARE_FOCUSABLE
         }
     }
 
     private suspend fun updateFilesStatus(filesStatus: List<FileStatus>) {
-        if (filesInternalState.size != filesStatus.size) {
+        if (_homeState.value.filesState.size != filesStatus.size) {
             Log.wtf(
                 "HomeScreenViewModel_updateFilesStatus",
                 "Could not update file status, number of status does not match the number of files."
             )
             _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Internal error: could not find files status"))
         } else {
-            filesInternalState.forEachIndexed { fileIndex, fileStatus ->
-                fileStatus.status = listOf(filesStatus[fileIndex])
+            _homeState.update { currentState ->
+                currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileStatus ->
+                    fileStatus.copy(status = listOf(filesStatus[fileIndex]))
+                })
             }
 
-            _homeUiState.update { currentState ->
-                currentState.copy(
-                    filesUiState =
-                        currentState.filesUiState.mapIndexed { fileIndex, fileState ->
-                            fileState.copy(
-                                status = filesInternalState[fileIndex].status.map { status -> status.toUi() }
-                            )
-                        }
-                )
-            }
         }
     }
 
     private fun clearFilesStatus() {
-        filesInternalState.forEach { it.status = listOf() }
-        _homeUiState.update { currentState ->
-            currentState.copy(filesUiState = currentState.filesUiState.map {
+        _homeState.update { currentState ->
+            currentState.copy(filesState = currentState.filesState.map {
                 it.copy(
                     status = listOf()
                 )
@@ -467,8 +502,8 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 withContext(Dispatchers.IO) {
                     createTestsFiles()
                     checkActiveBranch()
-                    initializeFileUiState()
-                    for (fileIndex in 0..<filesInternalState.size) {
+                    initializeFileState()
+                    for (fileIndex in 0..<_homeState.value.filesState.size) {
                         checkFileBlocks(fileIndex)
                     }
                     changeCurrentCommand(GitCommand.Init)
@@ -483,16 +518,6 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
-    private val fileIndexToColorMap = mapOf(
-        0 to Blue,
-        1 to Orange,
-        2 to Red,
-        3 to Purple,
-        4 to Brown,
-        5 to Pink,
-        6 to Black,
-        7 to Olive
-    )
 
     companion object {
         fun provideFactory(workingDirectory: Path): ViewModelProvider.Factory =
