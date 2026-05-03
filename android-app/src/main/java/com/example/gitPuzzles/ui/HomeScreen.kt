@@ -51,6 +51,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gitPuzzles.R
+import com.example.gitPuzzles.themlng.Green
 import gitLogic.GitCommand
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.min
@@ -110,15 +111,16 @@ fun HomeScreen(
 
             if (openCommandChooser.value) {
                 GridOfAllCommands(
+                    commandsUiState = homeUiState.commandsUiState,
                     onDismissRequest = onCommandChooserDismissRequest,
-                    onCommandButtonClick = viewModel::changeCurrentCommand
+                    onCommandButtonClick = viewModel::onCommandSelection
                 )
             }
             HomeScreenBottomBar(
-                onCommandButtonClick = viewModel::changeCurrentCommand,
+                commandsUiState = homeUiState.commandsUiState,
+                onCommandButtonClick = viewModel::onCommandSelection,
                 onExecuteButtonClick = viewModel::executeCurrentCommand,
                 onMoreCommandsClick = onMoreCommandsClick,
-                currentCommand = homeUiState.currentCommand ?: GitCommand.Init,
                 modifier = Modifier.weight(0.2f)
             )
         }
@@ -126,7 +128,7 @@ fun HomeScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .offset(y = (-100).dp)
+                .offset(y = (-160).dp)
         )
     }
 }
@@ -160,10 +162,10 @@ fun HomeScreenTopBar(
 
 @Composable
 fun HomeScreenBottomBar(
+    commandsUiState: List<CommandUiState>,
     onCommandButtonClick: (GitCommand) -> Unit,
     onExecuteButtonClick: () -> Unit,
     onMoreCommandsClick: () -> Unit,
-    currentCommand: GitCommand,
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier) {
@@ -181,7 +183,7 @@ fun HomeScreenBottomBar(
                     .fillMaxHeight(0.5f)
             )
             CommandChooser(
-                commands = listOf(GitCommand.Init),
+                commandsUiState = commandsUiState,
                 onCommandClick = onCommandButtonClick,
                 onMoreCommandsClick = onMoreCommandsClick,
                 modifier = Modifier.weight(2f)
@@ -203,29 +205,34 @@ fun HomeScreenBottomBar(
 @OptIn(ExperimentalGridApi::class)
 @Composable
 fun CommandChooser(
-    commands: List<GitCommand>, onCommandClick: (GitCommand) -> Unit,
+    commandsUiState: List<CommandUiState>,
+    onCommandClick: (GitCommand) -> Unit,
     onMoreCommandsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val nbOfRows = 2
-    val nbOfCols = 2
     Grid(
         config =
             {
-                repeat(nbOfCols) {
-                    column(1f / nbOfCols)
+                repeat(HomeViewModel.COMMAND_CHOOSER_NB_COLS) {
+                    column(1f / HomeViewModel.COMMAND_CHOOSER_NB_COLS)
                 }
-                repeat(nbOfRows) {
-                    row(1f / nbOfRows)
+                repeat(HomeViewModel.COMMAND_CHOOSER_NB_ROWS) {
+                    row(1f / HomeViewModel.COMMAND_CHOOSER_NB_ROWS)
                 }
                 gap(2.dp)
 
             }, modifier = modifier
     )
     {
-        repeat(min(nbOfCols * nbOfRows - 1, commands.size))
+        repeat(
+            min(
+                HomeViewModel.COMMAND_CHOOSER_NB_COLS *
+                        HomeViewModel.COMMAND_CHOOSER_NB_ROWS - 1,
+                commandsUiState.size
+            )
+        )
         { commandNumber ->
-            CommandCard(commands[commandNumber], onCommandClick = onCommandClick)
+            CommandCard(commandsUiState[commandNumber], onCommandClick = onCommandClick)
         }
         TextButton(
             onClick = { onMoreCommandsClick() },
@@ -245,18 +252,18 @@ fun CommandChooser(
 
 @Composable
 fun CommandCard(
-    command: GitCommand,
+    commandUiState: CommandUiState,
     onCommandClick: (GitCommand) -> Unit,
     modifier: Modifier = Modifier
 ) {
     TextButton(
-        onClick = { onCommandClick(command) },
-        border = BorderStroke(2.dp, color = Color.Gray),
+        onClick = { onCommandClick(commandUiState.command) },
+        border = BorderStroke(2.dp, color = commandUiState.color),
         modifier = modifier.fillMaxSize()
     )
     {
         Text(
-            text = command.name,
+            text = commandUiState.command.name,
             textAlign = TextAlign.Center,
             autoSize = TextAutoSize.StepBased(minFontSize = 1.sp),
             maxLines = 1
@@ -266,6 +273,7 @@ fun CommandCard(
 
 @Composable
 fun GridOfAllCommands(
+    commandsUiState: List<CommandUiState>,
     onDismissRequest: () -> Unit,
     onCommandButtonClick: (GitCommand) -> Unit,
     modifier: Modifier = Modifier
@@ -283,15 +291,16 @@ fun GridOfAllCommands(
                 modifier = Modifier.fillMaxSize()
             )
             {
-                items(GitCommand.ALL_COMMANDS) { command ->
+                items(commandsUiState) { commandUiState ->
                     TextButton(
                         onClick = {
-                            onCommandButtonClick(command)
+                            onCommandButtonClick(commandUiState.command)
                             onDismissRequest()
                         },
+                        border = BorderStroke(2.dp, color = commandUiState.color),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = command.name)
+                        Text(text = commandUiState.command.name)
                     }
                 }
             }
@@ -325,34 +334,56 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
 @Preview
 @Composable
 fun GitStatusSurfacePreview() {
-    GitStatusSurface("testBranch")
+    GitStatusSurface(activeBranch = "testBranch")
 }
 
 @Preview
 @Composable
 fun GridOfAllCommandsPreview() {
-    GridOfAllCommands({}, {})
+    GridOfAllCommands(
+        commandsUiState = listOf(
+        CommandUiState(command = GitCommand.Init, color = Color.Gray),
+
+        CommandUiState(command = GitCommand.Add, color = Green),
+        CommandUiState(command = GitCommand.Status, color = Color.Gray)
+    ),
+        onDismissRequest = {},
+        onCommandButtonClick = {})
+
 }
 
 @Preview
 @Composable
 fun HomeScreenBottomBarPreview() {
     HomeScreenBottomBar(
-        {}, {}, onMoreCommandsClick = {},
-        GitCommand.Init, modifier = Modifier.height(200.dp)
+        commandsUiState = listOf(
+            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+
+            CommandUiState(command = GitCommand.Add, color = Green),
+            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+        ),
+        onCommandButtonClick = { _ -> },
+        onExecuteButtonClick = {},
+        onMoreCommandsClick = {},
+        modifier = Modifier.height(200.dp)
     )
 }
 
 @Preview
 @Composable
 fun HomeScreenTopBarPreview() {
-    HomeScreenTopBar("testBranch", {})
+    HomeScreenTopBar(activeBranch = "testBranch", onDeleteButtonClick = {})
 }
 
 @Preview
 @Composable
 fun CommandChooserPreview() {
     CommandChooser(
-        listOf(GitCommand.Init),
+        commandsUiState = listOf(
+                CommandUiState(command = GitCommand.Init, color = Color.Gray),
+
+                CommandUiState(command = GitCommand.Add, color = Green),
+                CommandUiState(command = GitCommand.Status, color = Color.Gray)
+            ),
         onCommandClick = {}, onMoreCommandsClick = {})
 }

@@ -53,15 +53,17 @@ import kotlin.random.Random
 private data class HomeState(
     val activeBranch: String? = null,
     val currentCommand: GitCommand? = null,
-    val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_IDLE,
-    val filesState: List<FileState> = listOf()
+    val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_FOCUSABLE,
+    val filesState: List<FileState> = listOf(),
+    val commandsState: List<CommandState> = listOf()
 )
 
 data class HomeUiState(
     val activeBranch: String? = null,
     val currentCommand: GitCommand? = null,
-    val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_IDLE,
-    val filesUiState: List<FileUiState> = listOf()
+    val filesInteractionMode: FilesInteractionMode = FilesInteractionMode.ARE_FOCUSABLE,
+    val filesUiState: List<FileUiState> = listOf(),
+    val commandsUiState: List<CommandUiState> = listOf()
 )
 
 private fun HomeState.toUiState(): HomeUiState {
@@ -69,7 +71,8 @@ private fun HomeState.toUiState(): HomeUiState {
         activeBranch = this.activeBranch,
         currentCommand = this.currentCommand,
         filesInteractionMode = this.filesInteractionMode,
-        filesUiState = this.filesState.map { it.toUiState() }
+        filesUiState = this.filesState.map { it.toUiState() },
+        commandsUiState = this.commandsState.map { it.toUiState() }
     )
 }
 
@@ -162,6 +165,23 @@ fun FileStatus.toUi(): FileStatusUi = when (this) {
 }
 // @formatter:on
 
+private data class CommandState(
+    val command: GitCommand = GitCommand.Init,
+    val isSelected: Boolean = false,
+)
+
+data class CommandUiState(
+    val command: GitCommand = GitCommand.Init,
+    val color: Color = White
+)
+
+private fun CommandState.toUiState(): CommandUiState {
+    return CommandUiState(
+        command = this.command,
+        color = if (this.isSelected) Green else Color.Gray
+    )
+}
+
 sealed class HomeUiEvent {
     data class ShowSnackBar(val message: String) : HomeUiEvent()
 }
@@ -202,7 +222,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         } catch (e: FileNotFoundException) {
             Log.d("HomeScreen_DeleteButton", "Try to delete git dir at $gitDir, but ${e.message}")
             viewModelScope.launch {
-                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Git repo is already deleted"))
+                _homeUiEvent.emit(ShowSnackBar("Git repo is already deleted"))
             }
 
         } catch (e: IOException) {
@@ -211,13 +231,18 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 "IO Exception when trying to delete git repo at path $gitDir, initial error : ${e.message}"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Deletion failed: Internal error"))
+                _homeUiEvent.emit(ShowSnackBar("Deletion failed: Internal error"))
             }
         }
     }
 
     fun executeCurrentCommand() {
-        val command = _homeState.value.currentCommand ?: return
+        val command = _homeState.value.currentCommand ?: run {
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar("Select a command to execute"))
+            }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO)
         {
             try {
@@ -270,6 +295,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 if (needToCheckActiveBranch) checkActiveBranch()
                 if (needToClearStatus) clearFilesStatus()
                 resetFilesInteractionState()
+                changeCurrentCommand(null)
 
             } catch (e: IOException) {
                 Log.d(
@@ -277,34 +303,28 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                     "Git command on a non initiated git repo, initial error ${e.message}"
                 )
                 viewModelScope.launch {
-                    _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Git repo not initialized"))
+                    _homeUiEvent.emit(ShowSnackBar("Git repo not initialized"))
                 }
             }
         }
     }
 
-    fun changeCurrentCommand(newCommand: GitCommand?) {
-        resetFilesInteractionState()
+    fun onCommandSelection(command: GitCommand) {
+        val isCommandSelectedAlready =
+            _homeState.value.commandsState.find { it.command == command }?.isSelected
+                ?: run {
+                    Log.wtf(
+                        "HomeScreen_CommandSelection",
+                        "Unsupported command, this should not happens"
+                    )
+                    viewModelScope.launch {
+                        _homeUiEvent.emit(ShowSnackBar("Unsupported command"))
+                    }
+                    return
+                }
 
-        _homeState.update { currentState ->
-            currentState.copy(
-                currentCommand = newCommand,
-                filesInteractionMode = getFilesInteractionModeFromCommand(newCommand)
-            )
-        }
-    }
+        changeCurrentCommand(newCommand = if (isCommandSelectedAlready) null else command)
 
-    fun initializeFileState() {
-        val filteredFiles =
-            workingDirectory.listDirectoryEntries().filter { !it.name.endsWith(".git") }
-        _homeState.update { current ->
-            current.copy(filesState = filteredFiles.mapIndexed { fileIndex, filePath ->
-                FileState(
-                    path = filePath,
-                    fileIndex = fileIndex
-                )
-            })
-        }
     }
 
     fun onFileInteraction(fileNumber: Int) {
@@ -331,7 +351,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 BlockModificationFlag.ADD_LINE -> {
                     if (blockToModify.size + 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
                         }
                         return
                     } else
@@ -341,7 +361,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 BlockModificationFlag.REMOVE_LINE -> {
                     if (blockToModify.size - 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Cannot remove line, min is ${BlockConfig.MIN_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar("Cannot remove line, min is ${BlockConfig.MIN_LINE_NUMBER}"))
                         }
                         return
                     } else
@@ -360,6 +380,50 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             )
         }
         writeFileBlocks(fileNumber)
+    }
+
+    private fun changeCurrentCommand(newCommand: GitCommand?) {
+        resetFilesInteractionState()
+
+        _homeState.update { currentState ->
+            currentState.copy(
+                currentCommand = newCommand,
+                filesInteractionMode = getFilesInteractionModeFromCommand(newCommand),
+                commandsState =
+                    if (newCommand == null) currentState.commandsState.map { it.copy(isSelected = false) }
+                    else {
+                        currentState.commandsState.map { commandState ->
+                            if (commandState.command == newCommand) commandState.copy(isSelected = true) else
+                                commandState.copy(isSelected = false)
+                        }
+                    }
+            )
+        }
+    }
+
+    private fun initializeFilesState() {
+        val filteredFiles =
+            workingDirectory.listDirectoryEntries().filter { !it.name.endsWith(".git") }
+        _homeState.update { current ->
+            current.copy(filesState = filteredFiles.mapIndexed { fileIndex, filePath ->
+                FileState(
+                    path = filePath,
+                    fileIndex = fileIndex
+                )
+            })
+        }
+    }
+
+    private fun initializeCommandsState(
+    ) {
+        _homeState.update { currentState ->
+            currentState.copy(commandsState = GitCommand.ALL_COMMANDS.map {
+                CommandState(
+                    command = it,
+                    isSelected = false,
+                )
+            })
+        }
     }
 
     private fun checkFileBlocks(fileNumber: Int) {
@@ -460,7 +524,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 "HomeScreenViewModel_updateFilesStatus",
                 "Could not update file status, number of status does not match the number of files."
             )
-            _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Internal error: could not find files status"))
+            _homeUiEvent.emit(ShowSnackBar("Internal error: could not find files status"))
         } else {
             _homeState.update { currentState ->
                 currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileStatus ->
@@ -502,24 +566,28 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 withContext(Dispatchers.IO) {
                     createTestsFiles()
                     checkActiveBranch()
-                    initializeFileState()
+                    initializeFilesState()
+                    initializeCommandsState()
                     for (fileIndex in 0..<_homeState.value.filesState.size) {
                         checkFileBlocks(fileIndex)
                     }
-                    changeCurrentCommand(GitCommand.Init)
                 }
             } catch (e: IOException) {
                 Log.wtf(
                     "HomeScreenViewModel_initialisation",
                     "Could not read files in working directory initial error : ${e.message}"
                 )
-                _homeUiEvent.emit(HomeUiEvent.ShowSnackBar("Could not read files in working directory"))
+                _homeUiEvent.emit(ShowSnackBar("Could not read files in working directory"))
             }
         }
     }
 
 
     companion object {
+
+        const val COMMAND_CHOOSER_NB_ROWS = 2
+        const val COMMAND_CHOOSER_NB_COLS = 2
+
         fun provideFactory(workingDirectory: Path): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {

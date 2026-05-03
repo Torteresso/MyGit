@@ -254,7 +254,7 @@ fun FileBlockModificationButton(
             .clickable(onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
 
     ) {
-        Icon(imageVector = icon, contentDescription = iconDescription)
+        Icon(imageVector = icon, contentDescription = iconDescription, tint = White)
 
     }
 }
@@ -438,7 +438,7 @@ fun SingleFileBlock(block: List<Float>, color: Color, modifier: Modifier = Modif
     BoxWithConstraints(modifier = modifier) {
         val maxLineHeight = 8.dp
         Column(modifier = Modifier.fillMaxSize()) {
-            block.forEachIndexed { lineIndex, lineLength ->
+            block.forEach { lineLength ->
                 Surface(
                     shape = RoundedCornerShape(
                         topStart = 0.dp,
