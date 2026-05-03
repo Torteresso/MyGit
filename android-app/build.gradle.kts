@@ -79,6 +79,9 @@ dependencies {
     implementation(libs.material.icons.core)
     implementation(libs.material.icons.extended)
 
+    // Layout (for Grid)
+    implementation(libs.androidx.compose.foundation.layout)
+
     // GitLogic
     implementation(project(":git-logic"))
 
