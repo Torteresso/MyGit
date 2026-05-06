@@ -7,14 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.gitPuzzles.themlng.Black
-import com.example.gitPuzzles.themlng.Blue
-import com.example.gitPuzzles.themlng.Brown
 import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Olive
-import com.example.gitPuzzles.themlng.Orange
-import com.example.gitPuzzles.themlng.Pink
-import com.example.gitPuzzles.themlng.Purple
 import com.example.gitPuzzles.themlng.Red
 import com.example.gitPuzzles.themlng.RedOrange
 import com.example.gitPuzzles.themlng.Transparent
@@ -77,14 +70,12 @@ private fun HomeState.toUiState(): HomeUiState {
 }
 
 private val fileIndexToColorMap = mapOf(
-    0 to Blue,
-    1 to Orange,
-    2 to Red,
-    3 to Purple,
-    4 to Brown,
-    5 to Pink,
-    6 to Black,
-    7 to Olive
+    0 to FileColor.BLUE,
+    1 to FileColor.RED,
+    2 to FileColor.PURPLE,
+    3 to FileColor.BROWN,
+    4 to FileColor.PINK,
+    5 to FileColor.OLIVE,
 )
 
 
@@ -94,6 +85,10 @@ enum class FilesInteractionMode {
 
 enum class FileInteractionState {
     SELECTED, FOCUSED, IDLE
+}
+
+enum class FileColor {
+    BLUE, RED, PURPLE, BROWN, PINK, OLIVE
 }
 
 private data class FileState(
@@ -106,7 +101,7 @@ private data class FileState(
 )
 
 data class FileUiState(
-    val color: Color = White,
+    val color: FileColor = FileColor.BLUE,
     val interactionState: FileInteractionState = FileInteractionState.IDLE,
     val status: List<FileStatusUi> = listOf(),
     val block1: List<Float> = listOf(),

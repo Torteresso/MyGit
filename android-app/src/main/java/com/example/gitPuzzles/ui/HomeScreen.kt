@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -84,11 +85,13 @@ fun HomeScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .padding(top = 20.dp, bottom = 10.dp)
                 .navigationBarsPadding()
         )
         {
@@ -97,7 +100,7 @@ fun HomeScreen(
                 onDeleteButtonClick = viewModel::deleteGitRepository,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.1f)
+                    .weight(0.12f)
             )
             FileSystemGrid(
                 filesUiStates = homeUiState.filesUiState,
@@ -106,7 +109,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(20.dp)
+                    .padding(start = 10.dp, end = 10.dp, top = 8.dp)
             )
 
             if (openCommandChooser.value) {
@@ -139,12 +142,16 @@ fun HomeScreenTopBar(
     onDeleteButtonClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(modifier = modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = modifier
+    ) {
+
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(4.dp)
+                .padding(top = 20.dp, end = 4.dp, start = 4.dp)
         )
         {
             GitStatusSurface(activeBranch)
@@ -168,7 +175,10 @@ fun HomeScreenBottomBar(
     onMoreCommandsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(modifier = modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = modifier
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
@@ -186,7 +196,9 @@ fun HomeScreenBottomBar(
                 commandsUiState = commandsUiState,
                 onCommandClick = onCommandButtonClick,
                 onMoreCommandsClick = onMoreCommandsClick,
-                modifier = Modifier.weight(2f)
+                modifier = Modifier
+                    .weight(2f)
+                    .padding(4.dp)
             )
 
             IconButton(
@@ -265,7 +277,7 @@ fun CommandCard(
         Text(
             text = commandUiState.command.name,
             textAlign = TextAlign.Center,
-            autoSize = TextAutoSize.StepBased(minFontSize = 1.sp),
+            autoSize = TextAutoSize.StepBased(minFontSize = 0.sp),
             maxLines = 1
         )
     }
@@ -310,25 +322,23 @@ fun GridOfAllCommands(
 
 @Composable
 fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = modifier.padding(4.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(4.dp)
-        ) {
-            if (activeBranch != null) {
-                Icon(
-                    painterResource(R.drawable.git_branch),
-                    contentDescription = "Git active branch",
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(activeBranch)
-            } else Text("No git repository")
-        }
+        if (activeBranch != null) {
+            Icon(
+                painterResource(R.drawable.git_branch),
+                contentDescription = "Git active branch",
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(activeBranch)
+        } else Text("No git repository")
     }
+
 }
 
 @Preview
@@ -342,11 +352,11 @@ fun GitStatusSurfacePreview() {
 fun GridOfAllCommandsPreview() {
     GridOfAllCommands(
         commandsUiState = listOf(
-        CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, color = Color.Gray),
 
-        CommandUiState(command = GitCommand.Add, color = Green),
-        CommandUiState(command = GitCommand.Status, color = Color.Gray)
-    ),
+            CommandUiState(command = GitCommand.Add, color = Green),
+            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+        ),
         onDismissRequest = {},
         onCommandButtonClick = {})
 
@@ -380,10 +390,10 @@ fun HomeScreenTopBarPreview() {
 fun CommandChooserPreview() {
     CommandChooser(
         commandsUiState = listOf(
-                CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, color = Color.Gray),
 
-                CommandUiState(command = GitCommand.Add, color = Green),
-                CommandUiState(command = GitCommand.Status, color = Color.Gray)
-            ),
+            CommandUiState(command = GitCommand.Add, color = Green),
+            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+        ),
         onCommandClick = {}, onMoreCommandsClick = {})
 }

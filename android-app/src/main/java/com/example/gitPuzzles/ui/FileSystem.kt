@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,14 +52,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gitPuzzles.numberToLetter
-import com.example.gitPuzzles.themlng.Black
-import com.example.gitPuzzles.themlng.Blue
-import com.example.gitPuzzles.themlng.Brown
 import com.example.gitPuzzles.themlng.DarkGreen
-import com.example.gitPuzzles.themlng.Green
 import com.example.gitPuzzles.themlng.StatusBackgroundColor
 import com.example.gitPuzzles.themlng.Transparent
 import com.example.gitPuzzles.themlng.White
+import com.example.gitPuzzles.ui.theme.extendedColorScheme
+import com.example.gitPuzzles.ui.theme.toColorFamily
 import gitLogic.FileStatus
 
 @Composable
@@ -184,8 +183,9 @@ fun FileCard(
 
 @Composable
 fun FileBlockAddAndRemoveButtons(
-    color: Color, cardInteriorSurfaceOffset: Offset,
-    blockButtonsCircleSize: IntSize, cardInteriorSurfaceSize: IntSize,
+    color: FileColor, cardInteriorSurfaceOffset: Offset,
+    blockButtonsCircleSize: IntSize,
+    cardInteriorSurfaceSize: IntSize,
     heightPositionFraction: Float,
     fileNumber: Int,
     blockNumber: Int,
@@ -226,7 +226,7 @@ fun FileBlockAddAndRemoveButtons(
                 .aspectRatio(1f)
                 .offset {
                     IntOffset(
-                        x = cardInteriorSurfaceOffset.x.toInt() + cardInteriorSurfaceSize.width
+                        x = cardInteriorSurfaceOffset.x.toInt() / 2 + cardInteriorSurfaceSize.width
                                 - blockButtonsCircleSize.width / 2,
                         y = cardInteriorSurfaceOffset.y.toInt()
                                 + (cardInteriorSurfaceSize.height * heightPositionFraction).toInt()
@@ -237,7 +237,7 @@ fun FileBlockAddAndRemoveButtons(
 
 @Composable
 fun FileBlockModificationButton(
-    color: Color,
+    color: FileColor,
     icon: ImageVector,
     iconDescription: String,
     fileNumber: Int,
@@ -248,13 +248,16 @@ fun FileBlockModificationButton(
 ) {
     Surface(
         shape = CircleShape,
-        color = color,
+        color = color.toColorFamily().colorContainer,
         modifier = modifier
-
             .clickable(onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
 
     ) {
-        Icon(imageVector = icon, contentDescription = iconDescription, tint = White)
+        Icon(
+            imageVector = icon,
+            contentDescription = iconDescription,
+            tint = color.toColorFamily().onColorContainer
+        )
 
     }
 }
@@ -267,13 +270,13 @@ fun FileCardNameIndicator(
 ) {
     Surface(
         shape = CircleShape,
-        color = fileUiState.color,
+        color = fileUiState.color.toColorFamily().colorContainer,
+        contentColor = White,
         modifier = modifier
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = numberToLetter(fileNumber),
-                color = Color.White,
                 autoSize = TextAutoSize.StepBased(),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxSize(0.5f)
@@ -293,49 +296,62 @@ fun FileCardInterior(
     @SuppressLint("ModifierParameter") fileStatusBadgeModifier: Modifier,
     modifier: Modifier = Modifier,
 ) {
-    val fileBorderColor = remember(fileUiState.interactionState, fileUiState.color) {
+
+    val unfocusedCardBorderColor = MaterialTheme.colorScheme.outline
+    val focusedCardBorderColor = fileUiState.color.toColorFamily().colorContainer
+    val selectedCardBorderColor = MaterialTheme.extendedColorScheme.fileGreen.colorContainer
+    val fileBorderColor = remember(
+        fileUiState.interactionState,
+        focusedCardBorderColor,
+        unfocusedCardBorderColor,
+        selectedCardBorderColor
+    ) {
         when (fileUiState.interactionState) {
             FileInteractionState.SELECTED -> {
 
                 Brush.linearGradient(
                     listOf(
-                        Green,
+                        selectedCardBorderColor,
                         DarkGreen
                     )
                 )
             }
 
-            FileInteractionState.FOCUSED -> SolidColor(fileUiState.color)
+            FileInteractionState.FOCUSED -> SolidColor(focusedCardBorderColor)
 
-            FileInteractionState.IDLE -> SolidColor(Color.Gray)
+            FileInteractionState.IDLE -> SolidColor(unfocusedCardBorderColor)
         }
     }
 
+    val unfocusedCardColor = MaterialTheme.colorScheme.surfaceContainer
+    val focusedCardColor = fileUiState.color.toColorFamily().colorContainer
     val fileBackgroundBrush = remember(
         fileUiState.interactionState,
-        fileUiState.color,
-        gradientSize
+        focusedCardColor,
+        gradientSize,
+        unfocusedCardColor
     ) {
         if (fileUiState.interactionState == FileInteractionState.FOCUSED) {
             Brush.radialGradient(
                 colors = listOf(
                     Color.Transparent,
-                    fileUiState.color.copy(alpha = 0.15f),
-                    fileUiState.color.copy(alpha = 0.3f),
+                    focusedCardColor.copy(alpha = 0.15f),
+                    focusedCardColor.copy(alpha = 0.3f),
                 ),
                 center = Offset.Unspecified,
                 radius = gradientSize
             )
         } else {
-            SolidColor(White)
+            SolidColor(unfocusedCardColor)
         }
     }
+    val cardShape = RoundedCornerShape(8.dp)
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = cardShape,
         color = Transparent,
         border = BorderStroke(3.dp, fileBorderColor),
         modifier = modifier
-            .background(fileBackgroundBrush)
+            .background(brush = fileBackgroundBrush, shape = cardShape)
             .clickable(onClick = { onFileClick(fileNumber) })
     ) {
         Column(
@@ -347,7 +363,7 @@ fun FileCardInterior(
             FileBlocks(
                 block1 = fileUiState.block1,
                 block2 = fileUiState.block2,
-                color = fileUiState.color,
+                fileColor = fileUiState.color,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1 - fileBlocksPositionInFractionHeight - fileBlocksBottomPaddingInFractionHeight)
@@ -390,10 +406,9 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        autoSize = TextAutoSize.StepBased(
-                            minFontSize = 2.sp,
-                            maxFontSize = 40.sp,
-                        ), modifier = Modifier.weight(1f)
+                        fontSize = 20.sp
+
+                        , modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = status.statusCodeY.first.toString(),
@@ -401,10 +416,8 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        autoSize = TextAutoSize.StepBased(
-                            minFontSize = 2.sp,
-                            maxFontSize = 40.sp,
-                        ), modifier = Modifier.weight(1f)
+                        fontSize = 20.sp
+                       , modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -416,17 +429,17 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
 fun FileBlocks(
     block1: List<Float>,
     block2: List<Float>,
-    color: Color,
+    fileColor: FileColor,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
         SingleFileBlock(
-            block = block1, color = color, modifier = Modifier
+            block = block1, fileColor = fileColor, modifier = Modifier
                 .weight(1f)
                 .padding(6.dp)
         )
         SingleFileBlock(
-            block = block2, color = color, modifier = Modifier
+            block = block2, fileColor = fileColor, modifier = Modifier
                 .weight(1f)
                 .padding(6.dp)
         )
@@ -434,7 +447,7 @@ fun FileBlocks(
 }
 
 @Composable
-fun SingleFileBlock(block: List<Float>, color: Color, modifier: Modifier = Modifier) {
+fun SingleFileBlock(block: List<Float>, fileColor: FileColor, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier = modifier) {
         val maxLineHeight = 8.dp
         Column(modifier = Modifier.fillMaxSize()) {
@@ -447,8 +460,11 @@ fun SingleFileBlock(block: List<Float>, color: Color, modifier: Modifier = Modif
                         bottomEnd = 4.dp
                     ),
                     tonalElevation = 2.dp,
-                    border = BorderStroke(0.1.dp, color = Black.copy(alpha = 0.5f)),
-                    color = color, modifier = Modifier
+                    border = BorderStroke(
+                        0.2.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    ),
+                    color = fileColor.toColorFamily().colorContainer, modifier = Modifier
                         .fillMaxWidth(lineLength)
                         .then(
                             if (this@BoxWithConstraints.maxHeight / block.size > maxLineHeight) Modifier.height(
@@ -470,14 +486,14 @@ fun FileSystemGridPreview() {
     FileSystemGrid(
         filesUiStates = listOf(
             FileUiState(
-                color = Blue,
+                color = FileColor.BLUE,
                 status = listOf(
 
                     FileStatus.ADDED.toUi(),
                 ), interactionState = FileInteractionState.FOCUSED
             ),
             FileUiState(
-                color = Brown, status = listOf(
+                color = FileColor.BROWN, status = listOf(
 
                     FileStatus.ADDED.toUi(),
                     FileStatus.MODIFIED_STAGED_DELETED.toUi(),
@@ -485,7 +501,7 @@ fun FileSystemGridPreview() {
 
             ),
             FileUiState(
-                color = Green,
+                color = FileColor.BROWN,
                 status = listOf(
 
                     FileStatus.DELETED_STAGED.toUi(),
@@ -505,7 +521,7 @@ fun FileCardPreview() {
         fileNumber = 2,
         fileUiState =
             FileUiState(
-                color = Blue, status = listOf(
+                color = FileColor.BLUE, status = listOf(
 
                     FileStatus.MODIFIED_UNSTAGED.toUi(),
                     FileStatus.ADDED.toUi(),
@@ -540,7 +556,7 @@ fun FileBlocksPreview() {
     FileBlocks(
         listOf(0.7f, 0.5f, 0.8f),
         listOf(0.7f, 0.3f, 0.4f),
-        color = Blue,
+        fileColor = FileColor.BLUE,
         modifier = Modifier.fillMaxSize()
     )
 }
