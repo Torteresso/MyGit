@@ -41,7 +41,7 @@ fun Color.toColorFamily(
 ): ColorFamily {
     val harmonized = this.harmonize(primaryColor)
     val scheme = dynamicColorScheme(
-        seedColor = this,
+        seedColor = harmonized,
         isDark = isDark,
         contrastLevel = contrastLevel
     )
@@ -52,6 +52,52 @@ fun Color.toColorFamily(
         onColorContainer = scheme.onPrimaryContainer,
     )
 }
+
+
+val extendedDark = ExtendedColorScheme(
+    fileBlue = ColorFamily(
+        fileBlueDark,
+        onFileBlueDark,
+        fileBlueContainerDark,
+        onFileBlueContainerDark,
+    ),
+    fileGreen = ColorFamily(
+        fileGreenDark,
+        onFileGreenDark,
+        fileGreenContainerDark,
+        onFileGreenContainerDark,
+    ),
+    fileRed = ColorFamily(
+        fileRedDark,
+        onFileRedDark,
+        fileRedContainerDark,
+        onFileRedContainerDark,
+    ),
+    filePurple = ColorFamily(
+        filePurpleDark,
+        onFilePurpleDark,
+        filePurpleContainerDark,
+        onFilePurpleContainerDark,
+    ),
+    fileBrown = ColorFamily(
+        fileBrownDark,
+        onFileBrownDark,
+        fileBrownContainerDark,
+        onFileBrownContainerDark,
+    ),
+    filePink = ColorFamily(
+        filePinkDark,
+        onFilePinkDark,
+        filePinkContainerDark,
+        onFilePinkContainerDark,
+    ),
+    fileOlive = ColorFamily(
+        fileOliveDark,
+        onFileOliveDark,
+        fileOliveContainerDark,
+        onFileOliveContainerDark,
+    ),
+)
 
 @Composable
 fun buildExtendedColorScheme(
@@ -349,230 +395,6 @@ val extendedLight = ExtendedColorScheme(
     ),
 )
 
-val extendedDark = ExtendedColorScheme(
-    fileBlue = ColorFamily(
-        fileBlueDark,
-        onFileBlueDark,
-        fileBlueContainerDark,
-        onFileBlueContainerDark,
-    ),
-    fileGreen = ColorFamily(
-        fileGreenDark,
-        onFileGreenDark,
-        fileGreenContainerDark,
-        onFileGreenContainerDark,
-    ),
-    fileRed = ColorFamily(
-        fileRedDark,
-        onFileRedDark,
-        fileRedContainerDark,
-        onFileRedContainerDark,
-    ),
-    filePurple = ColorFamily(
-        filePurpleDark,
-        onFilePurpleDark,
-        filePurpleContainerDark,
-        onFilePurpleContainerDark,
-    ),
-    fileBrown = ColorFamily(
-        fileBrownDark,
-        onFileBrownDark,
-        fileBrownContainerDark,
-        onFileBrownContainerDark,
-    ),
-    filePink = ColorFamily(
-        filePinkDark,
-        onFilePinkDark,
-        filePinkContainerDark,
-        onFilePinkContainerDark,
-    ),
-    fileOlive = ColorFamily(
-        fileOliveDark,
-        onFileOliveDark,
-        fileOliveContainerDark,
-        onFileOliveContainerDark,
-    ),
-)
-
-val extendedLightMediumContrast = ExtendedColorScheme(
-    fileBlue = ColorFamily(
-        fileBlueLightMediumContrast,
-        onFileBlueLightMediumContrast,
-        fileBlueContainerLightMediumContrast,
-        onFileBlueContainerLightMediumContrast,
-    ),
-    fileGreen = ColorFamily(
-        fileGreenLightMediumContrast,
-        onFileGreenLightMediumContrast,
-        fileGreenContainerLightMediumContrast,
-        onFileGreenContainerLightMediumContrast,
-    ),
-    fileRed = ColorFamily(
-        fileRedLightMediumContrast,
-        onFileRedLightMediumContrast,
-        fileRedContainerLightMediumContrast,
-        onFileRedContainerLightMediumContrast,
-    ),
-    filePurple = ColorFamily(
-        filePurpleLightMediumContrast,
-        onFilePurpleLightMediumContrast,
-        filePurpleContainerLightMediumContrast,
-        onFilePurpleContainerLightMediumContrast,
-    ),
-    fileBrown = ColorFamily(
-        fileBrownLightMediumContrast,
-        onFileBrownLightMediumContrast,
-        fileBrownContainerLightMediumContrast,
-        onFileBrownContainerLightMediumContrast,
-    ),
-    filePink = ColorFamily(
-        filePinkLightMediumContrast,
-        onFilePinkLightMediumContrast,
-        filePinkContainerLightMediumContrast,
-        onFilePinkContainerLightMediumContrast,
-    ),
-    fileOlive = ColorFamily(
-        fileOliveLightMediumContrast,
-        onFileOliveLightMediumContrast,
-        fileOliveContainerLightMediumContrast,
-        onFileOliveContainerLightMediumContrast,
-    ),
-)
-
-val extendedLightHighContrast = ExtendedColorScheme(
-    fileBlue = ColorFamily(
-        fileBlueLightHighContrast,
-        onFileBlueLightHighContrast,
-        fileBlueContainerLightHighContrast,
-        onFileBlueContainerLightHighContrast,
-    ),
-    fileGreen = ColorFamily(
-        fileGreenLightHighContrast,
-        onFileGreenLightHighContrast,
-        fileGreenContainerLightHighContrast,
-        onFileGreenContainerLightHighContrast,
-    ),
-    fileRed = ColorFamily(
-        fileRedLightHighContrast,
-        onFileRedLightHighContrast,
-        fileRedContainerLightHighContrast,
-        onFileRedContainerLightHighContrast,
-    ),
-    filePurple = ColorFamily(
-        filePurpleLightHighContrast,
-        onFilePurpleLightHighContrast,
-        filePurpleContainerLightHighContrast,
-        onFilePurpleContainerLightHighContrast,
-    ),
-    fileBrown = ColorFamily(
-        fileBrownLightHighContrast,
-        onFileBrownLightHighContrast,
-        fileBrownContainerLightHighContrast,
-        onFileBrownContainerLightHighContrast,
-    ),
-    filePink = ColorFamily(
-        filePinkLightHighContrast,
-        onFilePinkLightHighContrast,
-        filePinkContainerLightHighContrast,
-        onFilePinkContainerLightHighContrast,
-    ),
-    fileOlive = ColorFamily(
-        fileOliveLightHighContrast,
-        onFileOliveLightHighContrast,
-        fileOliveContainerLightHighContrast,
-        onFileOliveContainerLightHighContrast,
-    ),
-)
-
-val extendedDarkMediumContrast = ExtendedColorScheme(
-    fileBlue = ColorFamily(
-        fileBlueDarkMediumContrast,
-        onFileBlueDarkMediumContrast,
-        fileBlueContainerDarkMediumContrast,
-        onFileBlueContainerDarkMediumContrast,
-    ),
-    fileGreen = ColorFamily(
-        fileGreenDarkMediumContrast,
-        onFileGreenDarkMediumContrast,
-        fileGreenContainerDarkMediumContrast,
-        onFileGreenContainerDarkMediumContrast,
-    ),
-    fileRed = ColorFamily(
-        fileRedDarkMediumContrast,
-        onFileRedDarkMediumContrast,
-        fileRedContainerDarkMediumContrast,
-        onFileRedContainerDarkMediumContrast,
-    ),
-    filePurple = ColorFamily(
-        filePurpleDarkMediumContrast,
-        onFilePurpleDarkMediumContrast,
-        filePurpleContainerDarkMediumContrast,
-        onFilePurpleContainerDarkMediumContrast,
-    ),
-    fileBrown = ColorFamily(
-        fileBrownDarkMediumContrast,
-        onFileBrownDarkMediumContrast,
-        fileBrownContainerDarkMediumContrast,
-        onFileBrownContainerDarkMediumContrast,
-    ),
-    filePink = ColorFamily(
-        filePinkDarkMediumContrast,
-        onFilePinkDarkMediumContrast,
-        filePinkContainerDarkMediumContrast,
-        onFilePinkContainerDarkMediumContrast,
-    ),
-    fileOlive = ColorFamily(
-        fileOliveDarkMediumContrast,
-        onFileOliveDarkMediumContrast,
-        fileOliveContainerDarkMediumContrast,
-        onFileOliveContainerDarkMediumContrast,
-    ),
-)
-
-val extendedDarkHighContrast = ExtendedColorScheme(
-    fileBlue = ColorFamily(
-        fileBlueDarkHighContrast,
-        onFileBlueDarkHighContrast,
-        fileBlueContainerDarkHighContrast,
-        onFileBlueContainerDarkHighContrast,
-    ),
-    fileGreen = ColorFamily(
-        fileGreenDarkHighContrast,
-        onFileGreenDarkHighContrast,
-        fileGreenContainerDarkHighContrast,
-        onFileGreenContainerDarkHighContrast,
-    ),
-    fileRed = ColorFamily(
-        fileRedDarkHighContrast,
-        onFileRedDarkHighContrast,
-        fileRedContainerDarkHighContrast,
-        onFileRedContainerDarkHighContrast,
-    ),
-    filePurple = ColorFamily(
-        filePurpleDarkHighContrast,
-        onFilePurpleDarkHighContrast,
-        filePurpleContainerDarkHighContrast,
-        onFilePurpleContainerDarkHighContrast,
-    ),
-    fileBrown = ColorFamily(
-        fileBrownDarkHighContrast,
-        onFileBrownDarkHighContrast,
-        fileBrownContainerDarkHighContrast,
-        onFileBrownContainerDarkHighContrast,
-    ),
-    filePink = ColorFamily(
-        filePinkDarkHighContrast,
-        onFilePinkDarkHighContrast,
-        filePinkContainerDarkHighContrast,
-        onFilePinkContainerDarkHighContrast,
-    ),
-    fileOlive = ColorFamily(
-        fileOliveDarkHighContrast,
-        onFileOliveDarkHighContrast,
-        fileOliveContainerDarkHighContrast,
-        onFileOliveContainerDarkHighContrast,
-    ),
-)
 
 @Immutable
 data class ColorFamily(
@@ -580,10 +402,6 @@ data class ColorFamily(
     val onColor: Color,
     val colorContainer: Color,
     val onColorContainer: Color
-)
-
-val unspecified_scheme = ColorFamily(
-    Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
 )
 
 val LocalExtendedColors = staticCompositionLocalOf { extendedLight }
@@ -622,12 +440,14 @@ fun GitPuzzlesTheme(
         contrastLevel = contrastLevel
     )
 
-    CompositionLocalProvider(LocalExtendedColors provides extendedColorScheme) { }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalExtendedColors provides extendedColorScheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            content = content
+        )
+    }
+
 
 }
 

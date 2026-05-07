@@ -33,6 +33,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.window.core.layout.WindowSizeClass
 import com.example.gitPuzzles.R
 import com.example.gitPuzzles.themlng.Green
 import gitLogic.GitCommand
@@ -60,6 +62,7 @@ import kotlin.math.min
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    windowSizeClass: WindowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass,
 ) {
     val context = LocalContext.current
     val workingDirectory =
@@ -89,55 +92,106 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .navigationBarsPadding()
-        )
-        {
-            HomeScreenTopBar(
-                activeBranch = homeUiState.activeBranch,
-                onDeleteButtonClick = viewModel::deleteGitRepository,
+        if (windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.12f)
+                    .navigationBarsPadding()
             )
-            FileSystemGrid(
-                filesUiStates = homeUiState.filesUiState,
-                onFileClick = viewModel::onFileInteraction,
-                onBlockModificationButtonClick = viewModel::modifyFileBlock,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(start = 10.dp, end = 10.dp, top = 8.dp)
-            )
+            {
+                HomeScreenStatusBar(
+                    activeBranch = homeUiState.activeBranch,
+                    onDeleteButtonClick = viewModel::deleteGitRepository,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.12f)
+                )
+                FileSystemGrid(
+                    filesUiStates = homeUiState.filesUiState,
+                    onFileClick = viewModel::onFileInteraction,
+                    onBlockModificationButtonClick = viewModel::modifyFileBlock,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(start = 10.dp, end = 10.dp, top = 8.dp)
+                )
 
-            if (openCommandChooser.value) {
-                GridOfAllCommands(
+                if (openCommandChooser.value) {
+                    GridOfAllCommands(
+                        commandsUiState = homeUiState.commandsUiState,
+                        onDismissRequest = onCommandChooserDismissRequest,
+                        onCommandButtonClick = viewModel::onCommandSelection
+                    )
+                }
+                HomeScreenCommandsBar(
                     commandsUiState = homeUiState.commandsUiState,
-                    onDismissRequest = onCommandChooserDismissRequest,
-                    onCommandButtonClick = viewModel::onCommandSelection
+                    onCommandButtonClick = viewModel::onCommandSelection,
+                    onExecuteButtonClick = viewModel::executeCurrentCommand,
+                    onMoreCommandsClick = onMoreCommandsClick,
+                    modifier = Modifier.weight(0.2f)
                 )
             }
-            HomeScreenBottomBar(
-                commandsUiState = homeUiState.commandsUiState,
-                onCommandButtonClick = viewModel::onCommandSelection,
-                onExecuteButtonClick = viewModel::executeCurrentCommand,
-                onMoreCommandsClick = onMoreCommandsClick,
-                modifier = Modifier.weight(0.2f)
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-160).dp)
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .navigationBarsPadding()
+            )
+            {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(0.2f)
+                ) {
+                    HomeScreenStatusBar(
+                        activeBranch = homeUiState.activeBranch,
+                        onDeleteButtonClick = viewModel::deleteGitRepository,
+                        modifier = Modifier
+                    )
+                    HomeScreenCommandsBar(
+                        commandsUiState = homeUiState.commandsUiState,
+                        onCommandButtonClick = viewModel::onCommandSelection,
+                        onExecuteButtonClick = viewModel::executeCurrentCommand,
+                        onMoreCommandsClick = onMoreCommandsClick,
+                        modifier = Modifier
+                    )
+                }
+                FileSystemGrid(
+                    filesUiStates = homeUiState.filesUiState,
+                    onFileClick = viewModel::onFileInteraction,
+                    onBlockModificationButtonClick = viewModel::modifyFileBlock,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(0.8f)
+                        .padding(start = 10.dp, end = 10.dp, top = 8.dp)
+                )
+
+                if (openCommandChooser.value) {
+                    GridOfAllCommands(
+                        commandsUiState = homeUiState.commandsUiState,
+                        onDismissRequest = onCommandChooserDismissRequest,
+                        onCommandButtonClick = viewModel::onCommandSelection
+                    )
+                }
+
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-160).dp)
             )
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = (-160).dp)
-        )
     }
 }
 
 @Composable
-fun HomeScreenTopBar(
+fun HomeScreenStatusBar(
     activeBranch: String?,
     onDeleteButtonClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -168,7 +222,7 @@ fun HomeScreenTopBar(
 }
 
 @Composable
-fun HomeScreenBottomBar(
+fun HomeScreenCommandsBar(
     commandsUiState: List<CommandUiState>,
     onCommandButtonClick: (GitCommand) -> Unit,
     onExecuteButtonClick: () -> Unit,
@@ -364,8 +418,8 @@ fun GridOfAllCommandsPreview() {
 
 @Preview
 @Composable
-fun HomeScreenBottomBarPreview() {
-    HomeScreenBottomBar(
+fun HomeScreenCommandsBarPreview() {
+    HomeScreenCommandsBar(
         commandsUiState = listOf(
             CommandUiState(command = GitCommand.Init, color = Color.Gray),
 
@@ -381,8 +435,8 @@ fun HomeScreenBottomBarPreview() {
 
 @Preview
 @Composable
-fun HomeScreenTopBarPreview() {
-    HomeScreenTopBar(activeBranch = "testBranch", onDeleteButtonClick = {})
+fun HomeScreenStatusBarPreview() {
+    HomeScreenStatusBar(activeBranch = "testBranch", onDeleteButtonClick = {})
 }
 
 @Preview

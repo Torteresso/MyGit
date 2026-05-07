@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gitPuzzles.numberToLetter
+import com.example.gitPuzzles.themlng.Black
 import com.example.gitPuzzles.themlng.DarkGreen
 import com.example.gitPuzzles.themlng.StatusBackgroundColor
 import com.example.gitPuzzles.themlng.Transparent
@@ -248,7 +249,7 @@ fun FileBlockModificationButton(
 ) {
     Surface(
         shape = CircleShape,
-        color = color.toColorFamily().colorContainer,
+        color = color.toColorFamily().color,
         modifier = modifier
             .clickable(onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
 
@@ -256,7 +257,7 @@ fun FileBlockModificationButton(
         Icon(
             imageVector = icon,
             contentDescription = iconDescription,
-            tint = color.toColorFamily().onColorContainer
+            tint = color.toColorFamily().onColor
         )
 
     }
@@ -270,8 +271,8 @@ fun FileCardNameIndicator(
 ) {
     Surface(
         shape = CircleShape,
-        color = fileUiState.color.toColorFamily().colorContainer,
-        contentColor = White,
+        color = fileUiState.color.toColorFamily().color,
+        contentColor = fileUiState.color.toColorFamily().onColor,
         modifier = modifier
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -298,8 +299,8 @@ fun FileCardInterior(
 ) {
 
     val unfocusedCardBorderColor = MaterialTheme.colorScheme.outline
-    val focusedCardBorderColor = fileUiState.color.toColorFamily().colorContainer
-    val selectedCardBorderColor = MaterialTheme.extendedColorScheme.fileGreen.colorContainer
+    val focusedCardBorderColor = fileUiState.color.toColorFamily().color
+    val selectedCardBorderColor = MaterialTheme.extendedColorScheme.fileGreen.color
     val fileBorderColor = remember(
         fileUiState.interactionState,
         focusedCardBorderColor,
@@ -324,7 +325,7 @@ fun FileCardInterior(
     }
 
     val unfocusedCardColor = MaterialTheme.colorScheme.surfaceContainer
-    val focusedCardColor = fileUiState.color.toColorFamily().colorContainer
+    val focusedCardColor = fileUiState.color.toColorFamily().color
     val fileBackgroundBrush = remember(
         fileUiState.interactionState,
         focusedCardColor,
@@ -461,10 +462,10 @@ fun SingleFileBlock(block: List<Float>, fileColor: FileColor, modifier: Modifier
                     ),
                     tonalElevation = 2.dp,
                     border = BorderStroke(
-                        0.2.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        0.4.dp,
+                        color = fileColor.toColorFamily().onColor
                     ),
-                    color = fileColor.toColorFamily().colorContainer, modifier = Modifier
+                    color = fileColor.toColorFamily().color, modifier = Modifier
                         .fillMaxWidth(lineLength)
                         .then(
                             if (this@BoxWithConstraints.maxHeight / block.size > maxLineHeight) Modifier.height(

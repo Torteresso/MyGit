@@ -36,8 +36,10 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.appendText
+import kotlin.io.path.createDirectories
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.io.path.notExists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.random.Random
@@ -555,10 +557,15 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         }
     }
 
+    private fun createWorkingDirectory() {
+        if (workingDirectory.notExists()) workingDirectory.createDirectories()
+    }
+
     init {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
+                    createWorkingDirectory()
                     createTestsFiles()
                     checkActiveBranch()
                     initializeFilesState()
