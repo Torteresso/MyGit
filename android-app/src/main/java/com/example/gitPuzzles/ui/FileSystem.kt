@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +29,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,11 +58,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gitPuzzles.numberToLetter
-import com.example.gitPuzzles.themlng.Black
 import com.example.gitPuzzles.themlng.DarkGreen
 import com.example.gitPuzzles.themlng.StatusBackgroundColor
 import com.example.gitPuzzles.themlng.Transparent
-import com.example.gitPuzzles.themlng.White
 import com.example.gitPuzzles.ui.theme.extendedColorScheme
 import com.example.gitPuzzles.ui.theme.toColorFamily
 import gitLogic.FileStatus
@@ -64,26 +68,58 @@ import gitLogic.FileStatus
 @Composable
 fun FileSystemGrid(
     filesUiStates: List<FileUiState>,
+    isVertical: Boolean,
+    snackbarHostState : SnackbarHostState,
     onFileClick: (Int) -> Unit,
     onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier
-    )
+    Box(modifier = modifier)
     {
-        items(count = filesUiStates.size) { fileNumber ->
-            FileCard(
-                fileNumber = fileNumber,
-                fileUiState = filesUiStates[fileNumber],
-                onFileClick = onFileClick,
-                onBlockModificationButtonClick = onBlockModificationButtonClick,
-                modifier = Modifier
-                    .aspectRatio(0.8f)
-                    .padding(4.dp)
+        if (isVertical) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(10.dp),
+                modifier = Modifier.fillMaxSize()
             )
+            {
+                fileCardItems(filesUiStates, onFileClick, onBlockModificationButtonClick)
+
+            }
+        } else {
+            LazyHorizontalGrid(
+                rows = GridCells.Fixed(2),
+                contentPadding = PaddingValues(10.dp),
+                modifier = Modifier.fillMaxSize()
+            )
+            {
+                fileCardItems(filesUiStates, onFileClick, onBlockModificationButtonClick)
+            }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+
+        )
+    }
+}
+
+fun LazyGridScope.fileCardItems(
+    filesUiStates: List<FileUiState>,
+    onFileClick: (Int) -> Unit,
+    onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> Unit
+) {
+    items(count = filesUiStates.size) { fileNumber ->
+        FileCard(
+            fileNumber = fileNumber,
+            fileUiState = filesUiStates[fileNumber],
+            onFileClick = onFileClick,
+            onBlockModificationButtonClick = onBlockModificationButtonClick,
+            modifier = Modifier
+                .aspectRatio(0.8f)
+                .padding(4.dp)
+        )
     }
 }
 
@@ -407,9 +443,7 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        fontSize = 20.sp
-
-                        , modifier = Modifier.weight(1f)
+                        fontSize = 20.sp, modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = status.statusCodeY.first.toString(),
@@ -417,8 +451,7 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        fontSize = 20.sp
-                       , modifier = Modifier.weight(1f)
+                        fontSize = 20.sp, modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -509,6 +542,8 @@ fun FileSystemGridPreview() {
                 )
             ),
         ),
+        isVertical = true,
+        snackbarHostState = SnackbarHostState(),
         onFileClick = {},
         onBlockModificationButtonClick = { _, _, _ -> },
         modifier = Modifier.fillMaxWidth()

@@ -1,5 +1,6 @@
 package com.example.gitPuzzles.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,9 +13,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -88,32 +91,37 @@ fun HomeScreen(
         }
     }
 
+
+    val isVertical =
+        windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+
     Box(
         modifier = modifier
             .fillMaxSize()
+            .safeContentPadding()
     ) {
-        if (windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)) {
+        if (isVertical) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .navigationBarsPadding()
+                verticalArrangement = Arrangement.Center
             )
             {
                 HomeScreenStatusBar(
                     activeBranch = homeUiState.activeBranch,
                     onDeleteButtonClick = viewModel::deleteGitRepository,
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .weight(0.12f)
                 )
                 FileSystemGrid(
                     filesUiStates = homeUiState.filesUiState,
+                    isVertical = true,
+                    snackbarHostState = snackbarHostState,
                     onFileClick = viewModel::onFileInteraction,
                     onBlockModificationButtonClick = viewModel::modifyFileBlock,
                     modifier = Modifier
+                        .weight(9f)
                         .fillMaxWidth()
-                        .weight(1f)
-                        .padding(start = 10.dp, end = 10.dp, top = 8.dp)
                 )
 
                 if (openCommandChooser.value) {
@@ -125,50 +133,53 @@ fun HomeScreen(
                 }
                 HomeScreenCommandsBar(
                     commandsUiState = homeUiState.commandsUiState,
+                    isVertical = false,
                     onCommandButtonClick = viewModel::onCommandSelection,
                     onExecuteButtonClick = viewModel::executeCurrentCommand,
                     onMoreCommandsClick = onMoreCommandsClick,
-                    modifier = Modifier.weight(0.2f)
+                    modifier = Modifier
+                        .weight(2f)
+                        .fillMaxWidth()
                 )
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = (-160).dp)
-            )
+
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .navigationBarsPadding()
+                horizontalArrangement = Arrangement.Center
             )
             {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(0.2f)
+                    modifier = Modifier.weight(3f)
                 ) {
                     HomeScreenStatusBar(
                         activeBranch = homeUiState.activeBranch,
                         onDeleteButtonClick = viewModel::deleteGitRepository,
                         modifier = Modifier
+                            .weight(2f)
+                            .fillMaxWidth()
                     )
                     HomeScreenCommandsBar(
                         commandsUiState = homeUiState.commandsUiState,
+                        isVertical = true,
                         onCommandButtonClick = viewModel::onCommandSelection,
                         onExecuteButtonClick = viewModel::executeCurrentCommand,
                         onMoreCommandsClick = onMoreCommandsClick,
                         modifier = Modifier
+                            .weight(8f)
+                            .fillMaxWidth()
                     )
                 }
                 FileSystemGrid(
                     filesUiStates = homeUiState.filesUiState,
+                    isVertical = false,
+                    snackbarHostState = snackbarHostState,
                     onFileClick = viewModel::onFileInteraction,
                     onBlockModificationButtonClick = viewModel::modifyFileBlock,
                     modifier = Modifier
+                        .weight(7f)
                         .fillMaxHeight()
-                        .weight(0.8f)
-                        .padding(start = 10.dp, end = 10.dp, top = 8.dp)
                 )
 
                 if (openCommandChooser.value) {
@@ -180,12 +191,6 @@ fun HomeScreen(
                 }
 
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = (-160).dp)
-            )
         }
     }
 }
@@ -204,8 +209,6 @@ fun HomeScreenStatusBar(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp, end = 4.dp, start = 4.dp)
         )
         {
             GitStatusSurface(activeBranch)
@@ -224,47 +227,90 @@ fun HomeScreenStatusBar(
 @Composable
 fun HomeScreenCommandsBar(
     commandsUiState: List<CommandUiState>,
+    isVertical: Boolean,
     onCommandButtonClick: (GitCommand) -> Unit,
     onExecuteButtonClick: () -> Unit,
     onMoreCommandsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "git",
-                autoSize = TextAutoSize.StepBased(),
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(0.5f)
+        if (isVertical) {
+            Column(
+                modifier = Modifier.fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceAround
             )
-            CommandChooser(
-                commandsUiState = commandsUiState,
-                onCommandClick = onCommandButtonClick,
-                onMoreCommandsClick = onMoreCommandsClick,
-                modifier = Modifier
-                    .weight(2f)
-                    .padding(4.dp)
-            )
-
-            IconButton(
-                onClick = onExecuteButtonClick,
-                modifier = Modifier.weight(1f)
+            {
+                CommandBarContent(
+                    commandsUiState = commandsUiState,
+                    onCommandButtonClick = onCommandButtonClick,
+                    onExecuteButtonClick = onExecuteButtonClick,
+                    onMoreCommandsClick = onMoreCommandsClick,
+                    textModifier = Modifier
+                        .weight(1f),
+                    commandChooserModifier = Modifier
+                        .weight(2f)
+                        .padding(4.dp),
+                    executeButtonModifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painterResource(R.drawable.start_icon_24px),
-                    contentDescription = "Execute the command"
+                CommandBarContent(
+                    commandsUiState = commandsUiState,
+                    onCommandButtonClick = onCommandButtonClick,
+                    onExecuteButtonClick = onExecuteButtonClick,
+                    onMoreCommandsClick = onMoreCommandsClick,
+                    textModifier = Modifier
+                        .weight(1f),
+                    commandChooserModifier = Modifier
+                        .weight(2f)
+                        .padding(4.dp),
+                    executeButtonModifier = Modifier.weight(1f)
                 )
             }
         }
+    }
+}
+
+@Composable
+fun CommandBarContent(
+    commandsUiState: List<CommandUiState>,
+    onCommandButtonClick: (GitCommand) -> Unit,
+    onExecuteButtonClick: () -> Unit,
+    onMoreCommandsClick: () -> Unit,
+    @SuppressLint("ModifierParameter") textModifier: Modifier = Modifier,
+    commandChooserModifier: Modifier = Modifier,
+    executeButtonModifier: Modifier = Modifier,
+) {
+    Text(
+        text = "git",
+        style = MaterialTheme.typography.headlineMedium,
+        textAlign = TextAlign.Center,
+        modifier = textModifier
+    )
+    CommandChooser(
+        commandsUiState = commandsUiState,
+        onCommandClick = onCommandButtonClick,
+        onMoreCommandsClick = onMoreCommandsClick,
+        modifier = commandChooserModifier
+    )
+
+    IconButton(
+        onClick = onExecuteButtonClick,
+        modifier = executeButtonModifier
+    ) {
+        Icon(
+            painterResource(R.drawable.start_icon_24px),
+            contentDescription = "Execute the command"
+        )
     }
 }
 
@@ -298,18 +344,20 @@ fun CommandChooser(
             )
         )
         { commandNumber ->
-            CommandCard(commandsUiState[commandNumber], onCommandClick = onCommandClick)
+            CommandCard(commandsUiState[commandNumber],
+                onCommandClick = onCommandClick)
         }
         TextButton(
             onClick = { onMoreCommandsClick() },
+            shape = RoundedCornerShape(2.dp),
             border = BorderStroke(2.dp, color = Color.Gray),
-            modifier = modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
         {
             Text(
                 text = "...",
                 textAlign = TextAlign.Center,
-                autoSize = TextAutoSize.StepBased(minFontSize = 1.sp),
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1
             )
         }
@@ -323,15 +371,22 @@ fun CommandCard(
     modifier: Modifier = Modifier
 ) {
     TextButton(
+        colors = ButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = Color.Unspecified,
+            disabledContentColor = Color.Unspecified
+        ),
         onClick = { onCommandClick(commandUiState.command) },
+        shape = RoundedCornerShape(2.dp),
         border = BorderStroke(2.dp, color = commandUiState.color),
         modifier = modifier.fillMaxSize()
     )
     {
         Text(
             text = commandUiState.command.name,
+            style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
-            autoSize = TextAutoSize.StepBased(minFontSize = 0.sp),
             maxLines = 1
         )
     }
@@ -389,7 +444,7 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(activeBranch)
+            Text(text = activeBranch, style = MaterialTheme.typography.titleMedium)
         } else Text("No git repository")
     }
 
@@ -418,7 +473,7 @@ fun GridOfAllCommandsPreview() {
 
 @Preview
 @Composable
-fun HomeScreenCommandsBarPreview() {
+fun HomeScreenVerticalCommandsBarPreview() {
     HomeScreenCommandsBar(
         commandsUiState = listOf(
             CommandUiState(command = GitCommand.Init, color = Color.Gray),
@@ -429,6 +484,26 @@ fun HomeScreenCommandsBarPreview() {
         onCommandButtonClick = { _ -> },
         onExecuteButtonClick = {},
         onMoreCommandsClick = {},
+        isVertical = true,
+        modifier = Modifier.height(200.dp)
+    )
+}
+
+
+@Preview
+@Composable
+fun HomeScreenHorizontalCommandsBarPreview() {
+    HomeScreenCommandsBar(
+        commandsUiState = listOf(
+            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+
+            CommandUiState(command = GitCommand.Add, color = Green),
+            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+        ),
+        onCommandButtonClick = { _ -> },
+        onExecuteButtonClick = {},
+        onMoreCommandsClick = {},
+        isVertical = false,
         modifier = Modifier.height(200.dp)
     )
 }
@@ -436,7 +511,11 @@ fun HomeScreenCommandsBarPreview() {
 @Preview
 @Composable
 fun HomeScreenStatusBarPreview() {
-    HomeScreenStatusBar(activeBranch = "testBranch", onDeleteButtonClick = {})
+    HomeScreenStatusBar(
+        activeBranch = "testBranch",
+        onDeleteButtonClick = {},
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Preview
