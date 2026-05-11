@@ -42,6 +42,8 @@ import kotlin.io.path.name
 import kotlin.io.path.notExists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 
 
@@ -127,6 +129,10 @@ enum class BlockModificationFlag {
 object BlockConfig {
     const val MIN_LINE_NUMBER = 0
     const val MAX_LINE_NUMBER = 8
+    const val MAX_BLOCK_VALUE = 1f
+    const val MIN_BLOCK_VALUE = 0.1f
+    const val MAX_DIFF_BETWEEN_LINE_VALUE = 0.5f
+
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
 }
 
@@ -169,13 +175,13 @@ private data class CommandState(
 
 data class CommandUiState(
     val command: GitCommand = GitCommand.Init,
-    val color: Color = White
+    val isSelected: Boolean = false
 )
 
 private fun CommandState.toUiState(): CommandUiState {
     return CommandUiState(
         command = this.command,
-        color = if (this.isSelected) Green else Color.Gray
+        isSelected =this.isSelected
     )
 }
 
@@ -351,8 +357,21 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                             _homeUiEvent.emit(ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
                         }
                         return
-                    } else
-                        blockToModify + (0.1f + Random.nextFloat() * 0.9f)
+                    } else {
+                        val minBlockValue =
+                            max(
+                                blockToModify.getOrNull(blockToModify.size - 1)
+                                    ?: (BlockConfig.MIN_BLOCK_VALUE + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE),
+                                BlockConfig.MIN_BLOCK_VALUE + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                            ) - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                        val maxBlockValue =
+                            min(
+                                blockToModify.getOrNull(blockToModify.size - 1)
+                                    ?: (BlockConfig.MAX_BLOCK_VALUE - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE),
+                                BlockConfig.MAX_BLOCK_VALUE - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                            ) + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                        blockToModify + (minBlockValue + Random.nextFloat() * (maxBlockValue - minBlockValue))
+                    }
                 }
 
                 BlockModificationFlag.REMOVE_LINE -> {
@@ -543,17 +562,28 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     private fun createTestsFiles() {
+        val generateRandomBlockValue = { 0.1f + Random.nextFloat() * 0.9f }
         if (workingDirectory.listDirectoryEntries().size <= 1) {
-            workingDirectory.resolve("test.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test1.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test2.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test3.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test4.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test5.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test6.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test7.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test8.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test9.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test1.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test2.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test3.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test4.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test5.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test6.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test7.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test8.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test9.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
         }
     }
 

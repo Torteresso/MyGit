@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.Grid
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,20 +22,19 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,19 +45,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.window.core.layout.WindowSizeClass
 import com.example.gitPuzzles.R
-import com.example.gitPuzzles.themlng.Green
 import gitLogic.GitCommand
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.min
@@ -113,6 +110,9 @@ fun HomeScreen(
                         .weight(1f)
                         .fillMaxWidth()
                 )
+                HorizontalDivider(
+                    thickness = 0.5.dp
+                )
                 FileSystemGrid(
                     filesUiStates = homeUiState.filesUiState,
                     isVertical = true,
@@ -131,6 +131,9 @@ fun HomeScreen(
                         onCommandButtonClick = viewModel::onCommandSelection
                     )
                 }
+                HorizontalDivider(
+                    thickness = 0.5.dp
+                )
                 HomeScreenCommandsBar(
                     commandsUiState = homeUiState.commandsUiState,
                     isVertical = false,
@@ -171,6 +174,7 @@ fun HomeScreen(
                             .fillMaxWidth()
                     )
                 }
+                VerticalDivider(thickness = 0.5.dp)
                 FileSystemGrid(
                     filesUiStates = homeUiState.filesUiState,
                     isVertical = false,
@@ -202,7 +206,7 @@ fun HomeScreenStatusBar(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier
     ) {
 
@@ -234,7 +238,7 @@ fun HomeScreenCommandsBar(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier
     ) {
         if (isVertical) {
@@ -344,13 +348,22 @@ fun CommandChooser(
             )
         )
         { commandNumber ->
-            CommandCard(commandsUiState[commandNumber],
-                onCommandClick = onCommandClick)
+            CommandCard(
+                commandsUiState[commandNumber],
+                onCommandClick = onCommandClick,
+                modifier = Modifier.fillMaxSize()
+            )
         }
         TextButton(
+            colors = ButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = Color.Unspecified,
+                disabledContentColor = Color.Unspecified
+            ),
             onClick = { onMoreCommandsClick() },
             shape = RoundedCornerShape(2.dp),
-            border = BorderStroke(2.dp, color = Color.Gray),
+            border = BorderStroke(0.5.dp, color = MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxSize()
         )
         {
@@ -372,21 +385,23 @@ fun CommandCard(
 ) {
     TextButton(
         colors = ButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = if (commandUiState.isSelected) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = if (commandUiState.isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+            else MaterialTheme.colorScheme.onSurface,
             disabledContainerColor = Color.Unspecified,
             disabledContentColor = Color.Unspecified
         ),
         onClick = { onCommandClick(commandUiState.command) },
         shape = RoundedCornerShape(2.dp),
-        border = BorderStroke(2.dp, color = commandUiState.color),
-        modifier = modifier.fillMaxSize()
+        border = BorderStroke(0.5.dp, color = MaterialTheme.colorScheme.outline),
+        modifier = modifier
     )
     {
         Text(
             text = commandUiState.command.name,
-            style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleMedium,
             maxLines = 1
         )
     }
@@ -401,25 +416,31 @@ fun GridOfAllCommands(
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(300.dp)
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
+            modifier = modifier,
+            shape = RoundedCornerShape(4.dp),
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                modifier = Modifier.fillMaxSize()
+                contentPadding = PaddingValues(6.dp),
             )
             {
                 items(commandsUiState) { commandUiState ->
                     TextButton(
+                        colors = ButtonColors(
+                            containerColor = if (commandUiState.isSelected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainer,
+                            contentColor = if (commandUiState.isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                            else MaterialTheme.colorScheme.onSurface,
+                            disabledContainerColor = Color.Unspecified,
+                            disabledContentColor = Color.Unspecified
+                        ),
                         onClick = {
                             onCommandButtonClick(commandUiState.command)
                             onDismissRequest()
                         },
-                        border = BorderStroke(2.dp, color = commandUiState.color),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(2.dp),
+                        border = BorderStroke(0.5.dp, color = MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.padding(4.dp)
                     ) {
                         Text(text = commandUiState.command.name)
                     }
@@ -461,13 +482,14 @@ fun GitStatusSurfacePreview() {
 fun GridOfAllCommandsPreview() {
     GridOfAllCommands(
         commandsUiState = listOf(
-            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, isSelected = false),
 
-            CommandUiState(command = GitCommand.Add, color = Green),
-            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+            CommandUiState(command = GitCommand.Add, isSelected = true),
+            CommandUiState(command = GitCommand.Status, isSelected = false)
         ),
         onDismissRequest = {},
-        onCommandButtonClick = {})
+        onCommandButtonClick = {},
+        )
 
 }
 
@@ -476,10 +498,10 @@ fun GridOfAllCommandsPreview() {
 fun HomeScreenVerticalCommandsBarPreview() {
     HomeScreenCommandsBar(
         commandsUiState = listOf(
-            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, isSelected = false),
 
-            CommandUiState(command = GitCommand.Add, color = Green),
-            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+            CommandUiState(command = GitCommand.Add, isSelected = true),
+            CommandUiState(command = GitCommand.Status, isSelected = true)
         ),
         onCommandButtonClick = { _ -> },
         onExecuteButtonClick = {},
@@ -495,10 +517,10 @@ fun HomeScreenVerticalCommandsBarPreview() {
 fun HomeScreenHorizontalCommandsBarPreview() {
     HomeScreenCommandsBar(
         commandsUiState = listOf(
-            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, isSelected = false),
 
-            CommandUiState(command = GitCommand.Add, color = Green),
-            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+            CommandUiState(command = GitCommand.Add, isSelected = true),
+            CommandUiState(command = GitCommand.Status, isSelected = false)
         ),
         onCommandButtonClick = { _ -> },
         onExecuteButtonClick = {},
@@ -523,10 +545,10 @@ fun HomeScreenStatusBarPreview() {
 fun CommandChooserPreview() {
     CommandChooser(
         commandsUiState = listOf(
-            CommandUiState(command = GitCommand.Init, color = Color.Gray),
+            CommandUiState(command = GitCommand.Init, isSelected = false),
 
-            CommandUiState(command = GitCommand.Add, color = Green),
-            CommandUiState(command = GitCommand.Status, color = Color.Gray)
+            CommandUiState(command = GitCommand.Add, isSelected = true),
+            CommandUiState(command = GitCommand.Status, isSelected = false)
         ),
         onCommandClick = {}, onMoreCommandsClick = {})
 }
