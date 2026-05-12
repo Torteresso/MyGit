@@ -6,11 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.gitPuzzles"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.gitPuzzles"
@@ -43,8 +39,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.navigation3.runtime)
-    implementation(libs.navigation3.ui)
+
     val composeBom = platform("androidx.compose:compose-bom:2026.03.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -74,6 +69,8 @@ dependencies {
     implementation(libs.runtime.tracing)
     // For nav3
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigation3.ui)
 
     // Icons
     implementation(libs.material.icons.core)
@@ -81,6 +78,15 @@ dependencies {
 
     // Layout (for Grid)
     implementation(libs.androidx.compose.foundation.layout)
+
+    // Theming
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.text.google.fonts)
+    implementation(libs.materialKolor)
+
+    // Adaptative
+    implementation(libs.androidx.compose.adaptive)
+    implementation(libs.androidx.compose.adaptive.layout)
 
     // GitLogic
     implementation(project(":git-logic"))

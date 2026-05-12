@@ -17,3 +17,8 @@ internal val White = Color(0xFFEFEFEF)
 internal val ErrorColor = Color(0xFFE6FF00)
 internal val Transparent = Color(0x00FFFFFF)
 internal val StatusBackgroundColor = Color(0x4BF58A3B)
+
+internal val TestColor = Color(0xFF718CCB)
+internal val TestColor2 = Color(0xFF5E90C7)
+internal val TestColor3 = Color(0xFF2D4578)
+internal val TestColor4 = Color(0xFFAFC6FF)

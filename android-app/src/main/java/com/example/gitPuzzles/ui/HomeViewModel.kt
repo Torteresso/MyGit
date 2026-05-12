@@ -7,14 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.gitPuzzles.themlng.Black
-import com.example.gitPuzzles.themlng.Blue
-import com.example.gitPuzzles.themlng.Brown
 import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Olive
-import com.example.gitPuzzles.themlng.Orange
-import com.example.gitPuzzles.themlng.Pink
-import com.example.gitPuzzles.themlng.Purple
 import com.example.gitPuzzles.themlng.Red
 import com.example.gitPuzzles.themlng.RedOrange
 import com.example.gitPuzzles.themlng.Transparent
@@ -43,10 +36,14 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.appendText
+import kotlin.io.path.createDirectories
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.io.path.notExists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 
 
@@ -77,14 +74,12 @@ private fun HomeState.toUiState(): HomeUiState {
 }
 
 private val fileIndexToColorMap = mapOf(
-    0 to Blue,
-    1 to Orange,
-    2 to Red,
-    3 to Purple,
-    4 to Brown,
-    5 to Pink,
-    6 to Black,
-    7 to Olive
+    0 to FileColor.BLUE,
+    1 to FileColor.RED,
+    2 to FileColor.PURPLE,
+    3 to FileColor.BROWN,
+    4 to FileColor.PINK,
+    5 to FileColor.OLIVE,
 )
 
 
@@ -94,6 +89,10 @@ enum class FilesInteractionMode {
 
 enum class FileInteractionState {
     SELECTED, FOCUSED, IDLE
+}
+
+enum class FileColor {
+    BLUE, RED, PURPLE, BROWN, PINK, OLIVE
 }
 
 private data class FileState(
@@ -106,7 +105,7 @@ private data class FileState(
 )
 
 data class FileUiState(
-    val color: Color = White,
+    val color: FileColor = FileColor.BLUE,
     val interactionState: FileInteractionState = FileInteractionState.IDLE,
     val status: List<FileStatusUi> = listOf(),
     val block1: List<Float> = listOf(),
@@ -130,6 +129,10 @@ enum class BlockModificationFlag {
 object BlockConfig {
     const val MIN_LINE_NUMBER = 0
     const val MAX_LINE_NUMBER = 8
+    const val MAX_BLOCK_VALUE = 1f
+    const val MIN_BLOCK_VALUE = 0.1f
+    const val MAX_DIFF_BETWEEN_LINE_VALUE = 0.5f
+
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
 }
 
@@ -172,13 +175,13 @@ private data class CommandState(
 
 data class CommandUiState(
     val command: GitCommand = GitCommand.Init,
-    val color: Color = White
+    val isSelected: Boolean = false
 )
 
 private fun CommandState.toUiState(): CommandUiState {
     return CommandUiState(
         command = this.command,
-        color = if (this.isSelected) Green else Color.Gray
+        isSelected =this.isSelected
     )
 }
 
@@ -354,8 +357,21 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                             _homeUiEvent.emit(ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
                         }
                         return
-                    } else
-                        blockToModify + (0.1f + Random.nextFloat() * 0.9f)
+                    } else {
+                        val minBlockValue =
+                            max(
+                                blockToModify.getOrNull(blockToModify.size - 1)
+                                    ?: (BlockConfig.MIN_BLOCK_VALUE + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE),
+                                BlockConfig.MIN_BLOCK_VALUE + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                            ) - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                        val maxBlockValue =
+                            min(
+                                blockToModify.getOrNull(blockToModify.size - 1)
+                                    ?: (BlockConfig.MAX_BLOCK_VALUE - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE),
+                                BlockConfig.MAX_BLOCK_VALUE - BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                            ) + BlockConfig.MAX_DIFF_BETWEEN_LINE_VALUE
+                        blockToModify + (minBlockValue + Random.nextFloat() * (maxBlockValue - minBlockValue))
+                    }
                 }
 
                 BlockModificationFlag.REMOVE_LINE -> {
@@ -546,24 +562,40 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     private fun createTestsFiles() {
+        val generateRandomBlockValue = { 0.1f + Random.nextFloat() * 0.9f }
         if (workingDirectory.listDirectoryEntries().size <= 1) {
-            workingDirectory.resolve("test.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test1.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test2.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test3.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test4.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test5.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test6.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test7.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test8.txt").writeText("#\n0.7\n#\n0.7\n")
-            workingDirectory.resolve("test9.txt").writeText("#\n0.7\n#\n0.7\n")
+            workingDirectory.resolve("test.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test1.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test2.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test3.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test4.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test5.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test6.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test7.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test8.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test9.txt")
+                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
         }
+    }
+
+    private fun createWorkingDirectory() {
+        if (workingDirectory.notExists()) workingDirectory.createDirectories()
     }
 
     init {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
+                    createWorkingDirectory()
                     createTestsFiles()
                     checkActiveBranch()
                     initializeFilesState()
