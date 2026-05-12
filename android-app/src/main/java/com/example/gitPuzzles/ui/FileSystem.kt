@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -56,10 +55,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.gitPuzzles.numberToLetter
 import com.example.gitPuzzles.themlng.DarkGreen
-import com.example.gitPuzzles.themlng.StatusBackgroundColor
 import com.example.gitPuzzles.themlng.Transparent
 import com.example.gitPuzzles.ui.theme.extendedColorScheme
 import com.example.gitPuzzles.ui.theme.toColorFamily
@@ -69,7 +66,7 @@ import gitLogic.FileStatus
 fun FileSystemGrid(
     filesUiStates: List<FileUiState>,
     isVertical: Boolean,
-    snackbarHostState : SnackbarHostState,
+    snackbarHostState: SnackbarHostState,
     onFileClick: (Int) -> Unit,
     onBlockModificationButtonClick: (Int, Int, BlockModificationFlag) -> Unit,
     modifier: Modifier = Modifier
@@ -424,10 +421,10 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
         fileStatus.forEach { status ->
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = StatusBackgroundColor,
+                border = BorderStroke(width = 0.5.dp, color = MaterialTheme.colorScheme.outline),
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier = Modifier
-                    .fillMaxWidth(0.25f)
-                    .aspectRatio(1.3f)
+
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
@@ -443,7 +440,7 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        fontSize = 20.sp, modifier = Modifier.weight(1f)
+                        style = MaterialTheme.typography.labelMedium,
                     )
                     Text(
                         text = status.statusCodeY.first.toString(),
@@ -451,7 +448,7 @@ fun FileStatusBadges(fileStatus: List<FileStatusUi>, modifier: Modifier = Modifi
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        fontSize = 20.sp, modifier = Modifier.weight(1f)
+                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
