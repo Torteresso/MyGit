@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui
+package com.gitPuzzles.ui
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
@@ -54,7 +54,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.window.core.layout.WindowSizeClass
-import com.example.gitPuzzles.R
+import com.gitPuzzles.R
 import gitLogic.GitCommand
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.min
@@ -489,7 +489,7 @@ fun GridOfAllCommandsPreview() {
         ),
         onDismissRequest = {},
         onCommandButtonClick = {},
-        )
+    )
 
 }
 

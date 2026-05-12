@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui
+package com.gitPuzzles.ui
 
 import android.util.Log
 import androidx.compose.ui.graphics.Color
@@ -7,12 +7,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Red
-import com.example.gitPuzzles.themlng.RedOrange
-import com.example.gitPuzzles.themlng.Transparent
-import com.example.gitPuzzles.themlng.White
-import com.example.gitPuzzles.ui.HomeUiEvent.ShowSnackBar
+import com.gitPuzzles.themlng.Green
+import com.gitPuzzles.themlng.Red
+import com.gitPuzzles.themlng.RedOrange
+import com.gitPuzzles.themlng.Transparent
+import com.gitPuzzles.themlng.White
+import com.gitPuzzles.ui.HomeUiEvent.ShowSnackBar
 import gitLogic.AddConfig
 import gitLogic.FileStatus
 import gitLogic.GitCommand
@@ -181,7 +181,7 @@ data class CommandUiState(
 private fun CommandState.toUiState(): CommandUiState {
     return CommandUiState(
         command = this.command,
-        isSelected =this.isSelected
+        isSelected = this.isSelected
     )
 }
 

@@ -1,4 +1,4 @@
-package com.example.gitPuzzles
+package com.gitPuzzles
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.gitPuzzles.ui.theme.GitPuzzlesTheme
+import com.gitPuzzles.ui.theme.GitPuzzlesTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui
+package com.gitPuzzles.ui
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
@@ -55,11 +55,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.example.gitPuzzles.numberToLetter
-import com.example.gitPuzzles.themlng.DarkGreen
-import com.example.gitPuzzles.themlng.Transparent
-import com.example.gitPuzzles.ui.theme.extendedColorScheme
-import com.example.gitPuzzles.ui.theme.toColorFamily
+import com.gitPuzzles.numberToLetter
+import com.gitPuzzles.themlng.DarkGreen
+import com.gitPuzzles.themlng.Transparent
+import com.gitPuzzles.ui.theme.extendedColorScheme
+import com.gitPuzzles.ui.theme.toColorFamily
 import gitLogic.FileStatus
 
 @Composable

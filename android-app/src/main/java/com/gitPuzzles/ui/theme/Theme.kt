@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui.theme
+package com.gitPuzzles.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -13,13 +13,13 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import com.example.gitPuzzles.themlng.Blue
-import com.example.gitPuzzles.themlng.Brown
-import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Olive
-import com.example.gitPuzzles.themlng.Pink
-import com.example.gitPuzzles.themlng.Purple
-import com.example.gitPuzzles.themlng.Red
+import com.gitPuzzles.themlng.Blue
+import com.gitPuzzles.themlng.Brown
+import com.gitPuzzles.themlng.Green
+import com.gitPuzzles.themlng.Olive
+import com.gitPuzzles.themlng.Pink
+import com.gitPuzzles.themlng.Purple
+import com.gitPuzzles.themlng.Red
 import com.materialkolor.dynamicColorScheme
 import com.materialkolor.ktx.harmonize
 

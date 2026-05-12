@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gitPuzzles"
+    namespace = "com.gitPuzzles"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.gitPuzzles"
+        applicationId = "com.gitPuzzles"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

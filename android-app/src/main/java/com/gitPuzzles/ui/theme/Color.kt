@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui.theme
+package com.gitPuzzles.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

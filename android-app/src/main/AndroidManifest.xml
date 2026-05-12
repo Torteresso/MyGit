@@ -10,7 +10,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyGit">
         <activity
-            android:name=".MainActivity"
+            android:name="com.gitPuzzles.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.MyGit">
             <intent-filter>
