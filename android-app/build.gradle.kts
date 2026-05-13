@@ -38,11 +38,20 @@ android {
 
 }
 
+
+
 dependencies {
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+
+    // Tests
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.kotlinx.coroutines.test)
+    implementation(libs.slf4j.nop)
 
     // Choose one of the following:
     // Material Design 3
@@ -91,4 +100,9 @@ dependencies {
     // GitLogic
     implementation(project(":git-logic"))
 
+}
+
+tasks.withType<Test> {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
 }
