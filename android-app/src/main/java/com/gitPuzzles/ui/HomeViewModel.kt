@@ -129,6 +129,7 @@ enum class BlockModificationFlag {
 
 object BlockConfig {
     const val MIN_LINE_NUMBER = 0
+    const val INITIAL_LINE_NUMBER = 4
     const val MAX_LINE_NUMBER = 8
     const val MAX_BLOCK_VALUE = 1f
     const val MIN_BLOCK_VALUE = 0.1f
@@ -335,10 +336,20 @@ class HomeViewModel(
     }
 
     fun onFileInteraction(fileNumber: Int) {
-        when (_homeState.value.filesInteractionMode) {
-            FilesInteractionMode.ARE_IDLE -> return
-            FilesInteractionMode.ARE_SELECTABLE -> selectFile(fileNumber)
-            FilesInteractionMode.ARE_FOCUSABLE -> focusFile(fileNumber)
+        if (fileNumber >= _homeState.value.filesState.size || fileNumber < 0) {
+            Log.wtf(
+                "HomeScreen_onFileInteraction",
+                "fileNumber out of bound, should not happens"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar("File not found"))
+            }
+        } else {
+            when (_homeState.value.filesInteractionMode) {
+                FilesInteractionMode.ARE_IDLE -> return
+                FilesInteractionMode.ARE_SELECTABLE -> selectFile(fileNumber)
+                FilesInteractionMode.ARE_FOCUSABLE -> focusFile(fileNumber)
+            }
         }
     }
 
@@ -348,6 +359,26 @@ class HomeViewModel(
         blockNumber: Int,
         modificationFlag: BlockModificationFlag
     ) {
+        if (fileNumber >= _homeState.value.filesState.size || fileNumber < 0) {
+            Log.wtf(
+                "HomeScreen_modifyFileBlock",
+                "fileNumber out of bound"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar("Invalid file"))
+            }
+            return
+        }
+        if (blockNumber != 1 && blockNumber != 2) {
+            Log.wtf(
+                "HomeScreen_modifyFileBlock",
+                "blockNumber out of bound"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar("Invalid block"))
+            }
+            return
+        }
         val blockToModify =
             if (blockNumber == 1) _homeState.value.filesState[fileNumber].block1
             else _homeState.value.filesState[fileNumber].block2
@@ -567,27 +598,30 @@ class HomeViewModel(
 
     private fun createTestsFiles() {
         val generateRandomBlockValue = { 0.1f + Random.nextFloat() * 0.9f }
+        val generateRandomFileText = {
+            buildString {
+                appendLine("#")
+                repeat(BlockConfig.INITIAL_LINE_NUMBER) {
+                    appendLine(generateRandomBlockValue())
+                }
+                appendLine("#")
+                repeat(BlockConfig.INITIAL_LINE_NUMBER) {
+                    appendLine(generateRandomBlockValue())
+                }
+            }
+        }
         if (workingDirectory.listDirectoryEntries().size <= 1) {
-            workingDirectory.resolve("test.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test1.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test2.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test3.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test4.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test5.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test6.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test7.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test8.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test9.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test1.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test2.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test3.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test4.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test5.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test6.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test7.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test8.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test9.txt").writeText(generateRandomFileText())
+
         }
     }
 

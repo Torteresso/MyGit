@@ -1,5 +1,8 @@
 package com.gitPuzzles
 
+import com.gitPuzzles.ui.BlockConfig
+import com.gitPuzzles.ui.BlockModificationFlag
+import com.gitPuzzles.ui.FileInteractionState
 import com.gitPuzzles.ui.FileStatusUi
 import com.gitPuzzles.ui.HomeUiEvent
 import com.gitPuzzles.ui.HomeUiState
@@ -266,15 +269,144 @@ class HomeViewModelTest {
             assertNull(viewModel.homeUiState.value.currentCommand)
         }
 
+    @Test
+    fun onFileInteraction_fileIsFocusable_updatesFileState() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, _ ->
+            assertEquals(
+                FileInteractionState.IDLE,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+
+            viewModel.onFileInteraction(0)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                FileInteractionState.FOCUSED,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+
+            viewModel.onFileInteraction(0)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                FileInteractionState.IDLE,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+        }
+
+    @Test
+    fun onFileInteraction_fileIsSelectable_updatesFileState() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, _ ->
+            viewModel.onCommandSelection(GitCommand.Add)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                FileInteractionState.IDLE,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+
+            viewModel.onFileInteraction(0)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                FileInteractionState.SELECTED,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+
+            viewModel.onFileInteraction(0)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                FileInteractionState.IDLE,
+                viewModel.homeUiState.value.filesUiState[0].interactionState
+            )
+        }
+
+    @Test
+    fun onFileInteraction_invalidFileIndex_emitSnackbar() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+
+            viewModel.onFileInteraction(-1)
+            testScheduler.advanceUntilIdle()
+
+
+            assertTrue(events.any { it is HomeUiEvent.ShowSnackBar })
+        }
+
+    @Test
+    fun modifyFileBlock_invalidFileIndex_emitSnackBar() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+            viewModel.modifyFileBlock(-1, blockNumber = 1, BlockModificationFlag.REMOVE_LINE)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(events.any { it is HomeUiEvent.ShowSnackBar })
+
+        }
+
+    @Test
+    fun modifyFileBlock_invalidBlockNumber_emitSnackBar() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+            viewModel.modifyFileBlock(0, blockNumber = -1, BlockModificationFlag.REMOVE_LINE)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(events.any { it is HomeUiEvent.ShowSnackBar })
+
+        }
+
+    @Test
+    fun modifyFileBlock_validBlockModification_updatesFileState() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+            viewModel.modifyFileBlock(0, blockNumber = 1, BlockModificationFlag.REMOVE_LINE)
+            viewModel.modifyFileBlock(0, blockNumber = 2, BlockModificationFlag.ADD_LINE)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                BlockConfig.INITIAL_LINE_NUMBER - 1,
+                viewModel.homeUiState.value.filesUiState[0].block1.size
+            )
+            assertEquals(
+                BlockConfig.INITIAL_LINE_NUMBER + 1,
+                viewModel.homeUiState.value.filesUiState[0].block2.size
+            )
+        }
+
+    @Test
+    fun modifyFileBlock_removeBelowLowerLimit_emitSnackBar() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+            repeat(BlockConfig.INITIAL_LINE_NUMBER - BlockConfig.MIN_LINE_NUMBER + 1)
+            {
+                viewModel.modifyFileBlock(0, blockNumber = 1, BlockModificationFlag.REMOVE_LINE)
+            }
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(events.any { it is HomeUiEvent.ShowSnackBar })
+
+        }
+
+    @Test
+    fun modifyFileBlock_addAboveUpperLimit_emitSnackBar() =
+        initiateViewModelAndCollectStateAndEvents { viewModel, events ->
+            repeat(BlockConfig.MAX_LINE_NUMBER - BlockConfig.INITIAL_LINE_NUMBER + 1)
+            {
+                viewModel.modifyFileBlock(0, blockNumber = 1, BlockModificationFlag.ADD_LINE)
+            }
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(events.any { it is HomeUiEvent.ShowSnackBar })
+
+        }
+
     fun initiateViewModelAndCollectStateAndEvents(testBody: suspend TestScope.(viewModel: HomeViewModel, events: List<HomeUiEvent>) -> Unit) {
         runTest {
             val viewModel = HomeViewModel(workingDirectory, StandardTestDispatcher(testScheduler))
             testScheduler.advanceUntilIdle()
+
             val states = mutableListOf<HomeUiState>()
             val job1 = launch { viewModel.homeUiState.collect { states.add(it) } }
 
             val events = mutableListOf<HomeUiEvent>()
             val job2 = launch { viewModel.homeUiEvent.collect { events.add(it) } }
+            testScheduler.advanceUntilIdle()
 
             testBody(viewModel, events)
 
