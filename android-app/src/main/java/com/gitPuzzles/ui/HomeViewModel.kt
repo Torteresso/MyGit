@@ -18,10 +18,10 @@ import gitLogic.FileStatus
 import gitLogic.GitCommand
 import gitLogic.InitConfig
 import gitLogic.JGit
+import gitLogic.JGitUtilities
 import gitLogic.StatusConfig
-import gitLogic.getActiveBranch
 import gitLogic.repoDelete
-import gitLogic.repoFind
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +113,7 @@ data class FileUiState(
 )
 
 private fun FileState.toUiState(): FileUiState {
+    require(this.fileIndex >= 0) { "The file index must be non negative but is ${this.fileIndex}" }
     return FileUiState(
         color = fileIndexToColorMap.getValue(this.fileIndex % fileIndexToColorMap.size),
         interactionState = this.interactionState,
@@ -189,7 +190,10 @@ sealed class HomeUiEvent {
     data class ShowSnackBar(val message: String) : HomeUiEvent()
 }
 
-class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
+class HomeViewModel(
+    private val workingDirectory: Path,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : ViewModel() {
     private val _homeState = MutableStateFlow(HomeState())
     val homeUiState = _homeState
         .map { it.toUiState() }
@@ -204,10 +208,10 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
 
 
     fun checkActiveBranch() {
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
-            val repo = repoFind(workingDirectory)
-            val activeBranch = if (repo == null) null else getActiveBranch(repo)
+            val activeBranch = JGitUtilities().getActiveBranch(workingDirectory)
+
             if (_homeState.value.activeBranch != activeBranch) {
                 _homeState.update { currentState ->
                     currentState.copy(activeBranch = activeBranch)
@@ -246,7 +250,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
             }
             return
         }
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             try {
                 var needToCheckActiveBranch = false
@@ -444,7 +448,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
 
     private fun checkFileBlocks(fileNumber: Int) {
 
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             val blocks =
                 _homeState.value.filesState[fileNumber].path.readText().split("#")
@@ -500,7 +504,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     private fun writeFileBlocks(fileNumber: Int) {
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             _homeState.value.filesState[fileNumber].let {
                 it.path.writeText("#\n")
@@ -594,7 +598,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     init {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     createWorkingDirectory()
                     createTestsFiles()
                     checkActiveBranch()

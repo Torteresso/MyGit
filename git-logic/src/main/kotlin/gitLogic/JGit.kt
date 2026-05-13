@@ -4,6 +4,8 @@ import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.Status
 import org.eclipse.jgit.lib.IndexDiff
 import java.io.File
+import java.io.IOException
+import java.nio.file.Path
 import java.nio.file.Paths
 
 class JGit : GitCommandsFunctions {
@@ -56,6 +58,18 @@ class JGit : GitCommandsFunctions {
         }
     }
 
+}
+
+class JGitUtilities {
+    fun getActiveBranch(repoPath: Path): String? {
+        return try {
+            Git.open(repoPath.toFile()).use { git ->
+                git.repository.branch
+            }
+        } catch (e: IOException) {
+            null
+        }
+    }
 }
 
 private fun classifyFile(filePath: String, status: Status): FileStatus {
