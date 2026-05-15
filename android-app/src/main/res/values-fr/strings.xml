@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="statusBar_removeGitRepo_button">Supprimer le repository git</string>
+    <string name="commandBar_execution_button">Exécuter la commande</string>
+    <string name="statusBar_status_icon">Branche active</string>
+    <string name="statusBar_text_noGitRepo">Repo non initialisé</string>
+    <string name="error_gitRepo_alreadyDeleted">Repo déjà supprimer</string>
+    <string name="error_gitRepoDeletion_internalError">Erreur interne: la suppresion a échouée</string>
+    <string name="error_commandExecution_noCommandSelected">Sélectionner une commande à éxécuter</string>
+    <string name="error_commandExecution_noFileToAdd">Sélectionner au moins un fichier à ajouter</string>
+    <string name="error_commandExecution_repoNotInitialized">Repo non initialisé</string>
+    <string name="error_commandSelection_unsupportedCommand">Commande non supportée</string>
+    <string name="error_fileInteraction_fileNotFound">Fichier introuvable</string>
+    <string name="error_fileBlock_invalidFile">Fichier invalide</string>
+    <string name="error_fileBlock_invalidBlock">Paragraphe invalide</string>
+    <string name="error_fileBlock_cannotAddLine">Maximum de lignes atteint</string>
+    <string name="error_fileBlock_cannotRemoveLine">Minimum de lignes atteint</string>
+    <string name="error_fileStatus_cannotFind">Erreur interne: status du fichier introuvable</string>
+    <string name="error_viewModelInitialisation_couldNotReadFile">Erreur interne: les fichiers n\'ont pas pu être lû</string>
+    <string name="fileBlock_removeBlockButton_description">Supprimer la dernière ligne, bouton numéro </string>
+    <string name="fileBlock_addBlockButton_description">Ajouter une ligne, bouton numéro </string>
+</resources>

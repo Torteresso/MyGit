@@ -1,3 +1,25 @@
 <resources>
-    <string name="app_name">Git Puzzles</string>
+    <string name="app_name" translatable="false">Git Puzzles</string>
+    <string name="statusBar_removeGitRepo_button">Remove git repository</string>
+    <string name="commandBar_execution_button">Execute the command</string>
+    <string name="statusBar_status_icon">Active branch</string>
+    <string name="statusBar_text_noGitRepo">No git repository</string>
+    <string name="error_gitRepo_alreadyDeleted">Git repo is already deleted</string>
+    <string name="error_gitRepoDeletion_internalError">Internal error: deletion failed</string>
+    <string name="error_commandExecution_noCommandSelected">Select a command to execute</string>
+    <string name="error_commandExecution_noFileToAdd">Select at least one file to add</string>
+    <string name="error_commandExecution_repoNotInitialized">Git repo not initialized</string>
+    <string name="error_commandSelection_unsupportedCommand">Unsupported command</string>
+    <string name="error_fileInteraction_fileNotFound">File not found</string>
+    <string name="error_fileBlock_invalidFile">Invalid file</string>
+    <string name="error_fileBlock_invalidBlock">Invalid block</string>
+    <string name="error_fileBlock_cannotAddLine">Cannot add new line, maximum reached</string>
+    <string name="error_fileBlock_cannotRemoveLine">Cannot remove line, minimum reached</string>
+    <string name="error_fileStatus_cannotFind">Internal error: could not find files status</string>
+    <string name="error_viewModelInitialisation_couldNotReadFile">Internal error: could not read files in working directory</string>
+    <string name="moreCommandButton_text" translatable="false">...</string>
+    <string name="fileBlock_removeBlockButton_description">Remove last line, button number </string>
+    <string name="fileBlock_addBlockButton_description">Add new line, button number </string>
+    <string name="testTag_commandChooser" translatable="false">command_chooser</string>
+    <string name="testTag_fileNumber" translatable="false">fileNumber</string>
 </resources>
