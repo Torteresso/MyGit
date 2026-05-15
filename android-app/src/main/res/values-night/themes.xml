@@ -1,4 +1,0 @@
-<resources>
-
-    <style name="Theme.MyGit" parent="android:Theme.Material.Light.NoActionBar" />
-</resources>
