@@ -138,6 +138,10 @@ object BlockConfig {
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
 }
 
+object BranchConfig {
+    const val DEFAULT_NAME = "master"
+}
+
 data class FileStatusUi(
     val statusCodeX: Pair<Char, Color> = Pair(' ', White),
     val statusCodeY: Pair<Char, Color> = Pair(' ', White),
@@ -188,8 +192,25 @@ private fun CommandState.toUiState(): CommandUiState {
 }
 
 sealed class HomeUiEvent {
-    data class ShowSnackBar(val message: String) : HomeUiEvent()
+    data class ShowSnackBar(val message: SnackBarMessage) : HomeUiEvent()
+
+    enum class SnackBarMessage {
+        ERROR_GIT_REPO_ALREADY_DELETED,
+        ERROR_GIT_REPO_DELETION_INTERNAL_ERROR,
+        ERROR_COMMAND_EXECUTION_NO_COMMAND_SELECTED,
+        ERROR_COMMAND_EXECUTION_NO_FILE_TO_ADD,
+        ERROR_COMMAND_EXECUTION_REPO_NOT_INITIALIZED,
+        ERROR_COMMAND_SELECTION_UNSUPPORTED_COMMAND,
+        ERROR_FILE_INTERACTION_FILE_NOT_FOUND,
+        ERROR_FILE_BLOCK_INVALID_FILE,
+        ERROR_FILE_BLOCK_INVALID_BLOCK,
+        ERROR_FILE_BLOCK_CANNOT_ADD_LINE,
+        ERROR_FILE_BLOCK_CANNOT_REMOVE_LINE,
+        ERROR_FILE_STATUS_CANNOT_FIND,
+        ERROR_VIEWMODEL_INITIALISATION_COULD_NOT_READ_FILE
+    }
 }
+
 
 class HomeViewModel(
     private val workingDirectory: Path,
@@ -230,7 +251,7 @@ class HomeViewModel(
         } catch (e: FileNotFoundException) {
             Log.d("HomeScreen_DeleteButton", "Try to delete git dir at $gitDir, but ${e.message}")
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Git repo is already deleted"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_ALREADY_DELETED))
             }
 
         } catch (e: IOException) {
@@ -239,7 +260,7 @@ class HomeViewModel(
                 "IO Exception when trying to delete git repo at path $gitDir, initial error : ${e.message}"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Deletion failed: Internal error"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_DELETION_INTERNAL_ERROR))
             }
         }
     }
@@ -247,7 +268,7 @@ class HomeViewModel(
     fun executeCurrentCommand() {
         val command = _homeState.value.currentCommand ?: run {
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Select a command to execute"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_COMMAND_SELECTED))
             }
             return
         }
@@ -265,7 +286,7 @@ class HomeViewModel(
                         JGit().init(
                             InitConfig(
                                 path = workingDirectory.toString(),
-                                initialBranchName = "myBranch"
+                                initialBranchName = BranchConfig.DEFAULT_NAME
                             )
                         )
                         needToCheckActiveBranch = true
@@ -287,7 +308,7 @@ class HomeViewModel(
                                 .map { it.path.toString() }
 
                         if (filesToAdd.isEmpty()) {
-                            _homeUiEvent.emit(ShowSnackBar("Select at least one file to add"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_FILE_TO_ADD))
                         } else {
                             JGit().add(
                                 AddConfig(
@@ -311,7 +332,7 @@ class HomeViewModel(
                     "Git command on a non initiated git repo, initial error ${e.message}"
                 )
                 viewModelScope.launch {
-                    _homeUiEvent.emit(ShowSnackBar("Git repo not initialized"))
+                    _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_REPO_NOT_INITIALIZED))
                 }
             }
         }
@@ -326,7 +347,7 @@ class HomeViewModel(
                         "Unsupported command, this should not happens"
                     )
                     viewModelScope.launch {
-                        _homeUiEvent.emit(ShowSnackBar("Unsupported command"))
+                        _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_SELECTION_UNSUPPORTED_COMMAND))
                     }
                     return
                 }
@@ -342,7 +363,7 @@ class HomeViewModel(
                 "fileNumber out of bound, should not happens"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("File not found"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_INTERACTION_FILE_NOT_FOUND))
             }
         } else {
             when (_homeState.value.filesInteractionMode) {
@@ -365,7 +386,7 @@ class HomeViewModel(
                 "fileNumber out of bound"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Invalid file"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_FILE))
             }
             return
         }
@@ -375,7 +396,7 @@ class HomeViewModel(
                 "blockNumber out of bound"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Invalid block"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_BLOCK))
             }
             return
         }
@@ -389,7 +410,7 @@ class HomeViewModel(
                 BlockModificationFlag.ADD_LINE -> {
                     if (blockToModify.size + 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_ADD_LINE))
                         }
                         return
                     } else {
@@ -412,7 +433,7 @@ class HomeViewModel(
                 BlockModificationFlag.REMOVE_LINE -> {
                     if (blockToModify.size - 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(ShowSnackBar("Cannot remove line, min is ${BlockConfig.MIN_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_REMOVE_LINE))
                         }
                         return
                     } else
@@ -575,7 +596,7 @@ class HomeViewModel(
                 "HomeScreenViewModel_updateFilesStatus",
                 "Could not update file status, number of status does not match the number of files."
             )
-            _homeUiEvent.emit(ShowSnackBar("Internal error: could not find files status"))
+            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_STATUS_CANNOT_FIND))
         } else {
             _homeState.update { currentState ->
                 currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileStatus ->
@@ -647,7 +668,7 @@ class HomeViewModel(
                     "HomeScreenViewModel_initialisation",
                     "Could not read files in working directory initial error : ${e.message}"
                 )
-                _homeUiEvent.emit(ShowSnackBar("Could not read files in working directory"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_VIEWMODEL_INITIALISATION_COULD_NOT_READ_FILE))
             }
         }
     }

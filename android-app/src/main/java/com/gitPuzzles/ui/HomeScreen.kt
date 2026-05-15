@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -46,9 +48,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,13 +70,14 @@ import kotlin.math.min
 fun HomeScreen(
     modifier: Modifier = Modifier,
     windowSizeClass: WindowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass,
+    viewModel: HomeViewModel = viewModel(
+        factory = HomeViewModel.provideFactory(
+            LocalContext.current.applicationContext
+                .filesDir.resolve("mainGitFolder").toPath()
+        )
+    )
 ) {
-    val context = LocalContext.current
-    val workingDirectory =
-        remember { context.applicationContext.filesDir.resolve("mainGitFolder").toPath() }
-    val viewModel: HomeViewModel =
-        viewModel(factory = HomeViewModel.provideFactory(workingDirectory))
-
+    val resource = LocalResources.current
     val homeUiState by viewModel.homeUiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,11 +86,28 @@ fun HomeScreen(
     val onCommandChooserDismissRequest = remember { { openCommandChooser.value = false } }
     val onMoreCommandsClick = remember { { openCommandChooser.value = true } }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(resource) {
         viewModel.homeUiEvent.collectLatest { event ->
             when (event) {
                 is HomeUiEvent.ShowSnackBar -> {
-                    snackbarHostState.showSnackbar(event.message)
+                    val message = resource.getString(
+                        when (event.message) {
+                            HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_ALREADY_DELETED -> R.string.error_gitRepo_alreadyDeleted
+                            HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_DELETION_INTERNAL_ERROR -> R.string.error_gitRepoDeletion_internalError
+                            HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_COMMAND_SELECTED -> R.string.error_commandExecution_noCommandSelected
+                            HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_FILE_TO_ADD -> R.string.error_commandExecution_noFileToAdd
+                            HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_REPO_NOT_INITIALIZED -> R.string.error_commandExecution_repoNotInitialized
+                            HomeUiEvent.SnackBarMessage.ERROR_COMMAND_SELECTION_UNSUPPORTED_COMMAND -> R.string.error_commandSelection_unsupportedCommand
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_INTERACTION_FILE_NOT_FOUND -> R.string.error_fileInteraction_fileNotFound
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_FILE -> R.string.error_fileBlock_invalidFile
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_BLOCK -> R.string.error_fileBlock_invalidBlock
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_ADD_LINE -> R.string.error_fileBlock_cannotAddLine
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_REMOVE_LINE -> R.string.error_fileBlock_cannotRemoveLine
+                            HomeUiEvent.SnackBarMessage.ERROR_FILE_STATUS_CANNOT_FIND -> R.string.error_fileStatus_cannotFind
+                            HomeUiEvent.SnackBarMessage.ERROR_VIEWMODEL_INITIALISATION_COULD_NOT_READ_FILE -> R.string.error_viewModelInitialisation_couldNotReadFile
+                        }
+                    )
+                    snackbarHostState.showSnackbar(message = message)
                 }
             }
         }
@@ -193,7 +218,6 @@ fun HomeScreen(
                         onCommandButtonClick = viewModel::onCommandSelection
                     )
                 }
-
             }
         }
     }
@@ -215,13 +239,14 @@ fun HomeScreenStatusBar(
             modifier = Modifier
         )
         {
-            GitStatusSurface(activeBranch)
+            GitStatusSurface(activeBranch, modifier = Modifier.padding(horizontal = 48.dp))
             IconButton(
                 onClick = onDeleteButtonClick,
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Icon(
-                    Icons.Default.Delete, contentDescription = "Remove git repository"
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.statusBar_removeGitRepo_button)
                 )
             }
         }
@@ -313,7 +338,7 @@ fun CommandBarContent(
     ) {
         Icon(
             painterResource(R.drawable.start_icon_24px),
-            contentDescription = "Execute the command"
+            contentDescription = stringResource(R.string.commandBar_execution_button)
         )
     }
 }
@@ -337,7 +362,7 @@ fun CommandChooser(
                 }
                 gap(2.dp)
 
-            }, modifier = modifier
+            }, modifier = modifier.selectableGroup()
     )
     {
         repeat(
@@ -351,7 +376,8 @@ fun CommandChooser(
             CommandCard(
                 commandsUiState[commandNumber],
                 onCommandClick = onCommandClick,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
             )
         }
         TextButton(
@@ -368,7 +394,7 @@ fun CommandChooser(
         )
         {
             Text(
-                text = "...",
+                text = stringResource(R.string.moreCommandButton_text),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1
@@ -395,7 +421,10 @@ fun CommandCard(
         onClick = { onCommandClick(commandUiState.command) },
         shape = RoundedCornerShape(2.dp),
         border = BorderStroke(0.5.dp, color = MaterialTheme.colorScheme.outline),
-        modifier = modifier
+        modifier = modifier.selectable(
+            selected = commandUiState.isSelected,
+            role = Role.RadioButton,
+            onClick = {})
     )
     {
         Text(
@@ -416,12 +445,13 @@ fun GridOfAllCommands(
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
-            modifier = modifier,
+            modifier = modifier.testTag(stringResource(R.string.testTag_commandChooser)),
             shape = RoundedCornerShape(4.dp),
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(6.dp),
+                modifier = Modifier.selectableGroup()
             )
             {
                 items(commandsUiState) { commandUiState ->
@@ -440,7 +470,12 @@ fun GridOfAllCommands(
                         },
                         shape = RoundedCornerShape(2.dp),
                         border = BorderStroke(0.5.dp, color = MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.padding(4.dp)
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .selectable(
+                                selected = commandUiState.isSelected,
+                                role = Role.RadioButton,
+                                onClick = {})
                     ) {
                         Text(text = commandUiState.command.name)
                     }
@@ -461,14 +496,17 @@ fun GitStatusSurface(activeBranch: String?, modifier: Modifier = Modifier) {
         if (activeBranch != null) {
             Icon(
                 painterResource(R.drawable.git_branch),
-                contentDescription = "Git active branch",
+                contentDescription = stringResource(R.string.statusBar_status_icon),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = activeBranch, style = MaterialTheme.typography.titleMedium)
-        } else Text("No git repository")
+            Text(
+                text = activeBranch,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium
+            )
+        } else Text(stringResource(R.string.statusBar_text_noGitRepo))
     }
-
 }
 
 @Preview
@@ -530,11 +568,11 @@ fun HomeScreenHorizontalCommandsBarPreview() {
     )
 }
 
-@Preview
+@PreviewFontScale
 @Composable
 fun HomeScreenStatusBarPreview() {
     HomeScreenStatusBar(
-        activeBranch = "testBranch",
+        activeBranch = "veryLongLongLongLongLongLongBranch",
         onDeleteButtonClick = {},
         modifier = Modifier.fillMaxWidth()
     )
