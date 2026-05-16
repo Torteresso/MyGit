@@ -1,8 +1,8 @@
-package com.example.gitPuzzles.ui.theme
+package com.gitPuzzles.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import com.example.gitPuzzles.ui.FileColor
+import com.gitPuzzles.ui.FileColor
 
 @Composable
 fun FileColor.toColorFamily(): ColorFamily {

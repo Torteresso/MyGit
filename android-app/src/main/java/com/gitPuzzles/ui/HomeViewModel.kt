@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui
+package com.gitPuzzles.ui
 
 import android.util.Log
 import androidx.compose.ui.graphics.Color
@@ -7,21 +7,21 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.gitPuzzles.themlng.Green
-import com.example.gitPuzzles.themlng.Red
-import com.example.gitPuzzles.themlng.RedOrange
-import com.example.gitPuzzles.themlng.Transparent
-import com.example.gitPuzzles.themlng.White
-import com.example.gitPuzzles.ui.HomeUiEvent.ShowSnackBar
+import com.gitPuzzles.themlng.Green
+import com.gitPuzzles.themlng.Red
+import com.gitPuzzles.themlng.RedOrange
+import com.gitPuzzles.themlng.Transparent
+import com.gitPuzzles.themlng.White
+import com.gitPuzzles.ui.HomeUiEvent.ShowSnackBar
 import gitLogic.AddConfig
 import gitLogic.FileStatus
 import gitLogic.GitCommand
 import gitLogic.InitConfig
 import gitLogic.JGit
+import gitLogic.JGitUtilities
 import gitLogic.StatusConfig
-import gitLogic.getActiveBranch
 import gitLogic.repoDelete
-import gitLogic.repoFind
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +113,7 @@ data class FileUiState(
 )
 
 private fun FileState.toUiState(): FileUiState {
+    require(this.fileIndex >= 0) { "The file index must be non negative but is ${this.fileIndex}" }
     return FileUiState(
         color = fileIndexToColorMap.getValue(this.fileIndex % fileIndexToColorMap.size),
         interactionState = this.interactionState,
@@ -128,12 +129,17 @@ enum class BlockModificationFlag {
 
 object BlockConfig {
     const val MIN_LINE_NUMBER = 0
+    const val INITIAL_LINE_NUMBER = 4
     const val MAX_LINE_NUMBER = 8
     const val MAX_BLOCK_VALUE = 1f
     const val MIN_BLOCK_VALUE = 0.1f
     const val MAX_DIFF_BETWEEN_LINE_VALUE = 0.5f
 
     val VALID_LINE_RANGE = MIN_LINE_NUMBER..MAX_LINE_NUMBER
+}
+
+object BranchConfig {
+    const val DEFAULT_NAME = "master"
 }
 
 data class FileStatusUi(
@@ -181,15 +187,35 @@ data class CommandUiState(
 private fun CommandState.toUiState(): CommandUiState {
     return CommandUiState(
         command = this.command,
-        isSelected =this.isSelected
+        isSelected = this.isSelected
     )
 }
 
 sealed class HomeUiEvent {
-    data class ShowSnackBar(val message: String) : HomeUiEvent()
+    data class ShowSnackBar(val message: SnackBarMessage) : HomeUiEvent()
+
+    enum class SnackBarMessage {
+        ERROR_GIT_REPO_ALREADY_DELETED,
+        ERROR_GIT_REPO_DELETION_INTERNAL_ERROR,
+        ERROR_COMMAND_EXECUTION_NO_COMMAND_SELECTED,
+        ERROR_COMMAND_EXECUTION_NO_FILE_TO_ADD,
+        ERROR_COMMAND_EXECUTION_REPO_NOT_INITIALIZED,
+        ERROR_COMMAND_SELECTION_UNSUPPORTED_COMMAND,
+        ERROR_FILE_INTERACTION_FILE_NOT_FOUND,
+        ERROR_FILE_BLOCK_INVALID_FILE,
+        ERROR_FILE_BLOCK_INVALID_BLOCK,
+        ERROR_FILE_BLOCK_CANNOT_ADD_LINE,
+        ERROR_FILE_BLOCK_CANNOT_REMOVE_LINE,
+        ERROR_FILE_STATUS_CANNOT_FIND,
+        ERROR_VIEWMODEL_INITIALISATION_COULD_NOT_READ_FILE
+    }
 }
 
-class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
+
+class HomeViewModel(
+    private val workingDirectory: Path,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : ViewModel() {
     private val _homeState = MutableStateFlow(HomeState())
     val homeUiState = _homeState
         .map { it.toUiState() }
@@ -204,10 +230,10 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
 
 
     fun checkActiveBranch() {
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
-            val repo = repoFind(workingDirectory)
-            val activeBranch = if (repo == null) null else getActiveBranch(repo)
+            val activeBranch = JGitUtilities().getActiveBranch(workingDirectory)
+
             if (_homeState.value.activeBranch != activeBranch) {
                 _homeState.update { currentState ->
                     currentState.copy(activeBranch = activeBranch)
@@ -225,7 +251,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         } catch (e: FileNotFoundException) {
             Log.d("HomeScreen_DeleteButton", "Try to delete git dir at $gitDir, but ${e.message}")
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Git repo is already deleted"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_ALREADY_DELETED))
             }
 
         } catch (e: IOException) {
@@ -234,7 +260,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 "IO Exception when trying to delete git repo at path $gitDir, initial error : ${e.message}"
             )
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Deletion failed: Internal error"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_GIT_REPO_DELETION_INTERNAL_ERROR))
             }
         }
     }
@@ -242,11 +268,11 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     fun executeCurrentCommand() {
         val command = _homeState.value.currentCommand ?: run {
             viewModelScope.launch {
-                _homeUiEvent.emit(ShowSnackBar("Select a command to execute"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_COMMAND_SELECTED))
             }
             return
         }
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             try {
                 var needToCheckActiveBranch = false
@@ -260,7 +286,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                         JGit().init(
                             InitConfig(
                                 path = workingDirectory.toString(),
-                                initialBranchName = "myBranch"
+                                initialBranchName = BranchConfig.DEFAULT_NAME
                             )
                         )
                         needToCheckActiveBranch = true
@@ -282,7 +308,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                                 .map { it.path.toString() }
 
                         if (filesToAdd.isEmpty()) {
-                            _homeUiEvent.emit(ShowSnackBar("Select at least one file to add"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_NO_FILE_TO_ADD))
                         } else {
                             JGit().add(
                                 AddConfig(
@@ -306,7 +332,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                     "Git command on a non initiated git repo, initial error ${e.message}"
                 )
                 viewModelScope.launch {
-                    _homeUiEvent.emit(ShowSnackBar("Git repo not initialized"))
+                    _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_EXECUTION_REPO_NOT_INITIALIZED))
                 }
             }
         }
@@ -321,7 +347,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                         "Unsupported command, this should not happens"
                     )
                     viewModelScope.launch {
-                        _homeUiEvent.emit(ShowSnackBar("Unsupported command"))
+                        _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_COMMAND_SELECTION_UNSUPPORTED_COMMAND))
                     }
                     return
                 }
@@ -331,10 +357,20 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     fun onFileInteraction(fileNumber: Int) {
-        when (_homeState.value.filesInteractionMode) {
-            FilesInteractionMode.ARE_IDLE -> return
-            FilesInteractionMode.ARE_SELECTABLE -> selectFile(fileNumber)
-            FilesInteractionMode.ARE_FOCUSABLE -> focusFile(fileNumber)
+        if (fileNumber >= _homeState.value.filesState.size || fileNumber < 0) {
+            Log.wtf(
+                "HomeScreen_onFileInteraction",
+                "fileNumber out of bound, should not happens"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_INTERACTION_FILE_NOT_FOUND))
+            }
+        } else {
+            when (_homeState.value.filesInteractionMode) {
+                FilesInteractionMode.ARE_IDLE -> return
+                FilesInteractionMode.ARE_SELECTABLE -> selectFile(fileNumber)
+                FilesInteractionMode.ARE_FOCUSABLE -> focusFile(fileNumber)
+            }
         }
     }
 
@@ -344,6 +380,26 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
         blockNumber: Int,
         modificationFlag: BlockModificationFlag
     ) {
+        if (fileNumber >= _homeState.value.filesState.size || fileNumber < 0) {
+            Log.wtf(
+                "HomeScreen_modifyFileBlock",
+                "fileNumber out of bound"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_FILE))
+            }
+            return
+        }
+        if (blockNumber != 1 && blockNumber != 2) {
+            Log.wtf(
+                "HomeScreen_modifyFileBlock",
+                "blockNumber out of bound"
+            )
+            viewModelScope.launch {
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_INVALID_BLOCK))
+            }
+            return
+        }
         val blockToModify =
             if (blockNumber == 1) _homeState.value.filesState[fileNumber].block1
             else _homeState.value.filesState[fileNumber].block2
@@ -354,7 +410,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 BlockModificationFlag.ADD_LINE -> {
                     if (blockToModify.size + 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(ShowSnackBar("Cannot add new line, max is ${BlockConfig.MAX_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_ADD_LINE))
                         }
                         return
                     } else {
@@ -377,7 +433,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 BlockModificationFlag.REMOVE_LINE -> {
                     if (blockToModify.size - 1 !in BlockConfig.VALID_LINE_RANGE) {
                         viewModelScope.launch {
-                            _homeUiEvent.emit(ShowSnackBar("Cannot remove line, min is ${BlockConfig.MIN_LINE_NUMBER}"))
+                            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_BLOCK_CANNOT_REMOVE_LINE))
                         }
                         return
                     } else
@@ -444,7 +500,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
 
     private fun checkFileBlocks(fileNumber: Int) {
 
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             val blocks =
                 _homeState.value.filesState[fileNumber].path.readText().split("#")
@@ -500,7 +556,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     }
 
     private fun writeFileBlocks(fileNumber: Int) {
-        viewModelScope.launch(Dispatchers.IO)
+        viewModelScope.launch(ioDispatcher)
         {
             _homeState.value.filesState[fileNumber].let {
                 it.path.writeText("#\n")
@@ -540,7 +596,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                 "HomeScreenViewModel_updateFilesStatus",
                 "Could not update file status, number of status does not match the number of files."
             )
-            _homeUiEvent.emit(ShowSnackBar("Internal error: could not find files status"))
+            _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_FILE_STATUS_CANNOT_FIND))
         } else {
             _homeState.update { currentState ->
                 currentState.copy(filesState = currentState.filesState.mapIndexed { fileIndex, fileStatus ->
@@ -563,27 +619,30 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
 
     private fun createTestsFiles() {
         val generateRandomBlockValue = { 0.1f + Random.nextFloat() * 0.9f }
+        val generateRandomFileText = {
+            buildString {
+                appendLine("#")
+                repeat(BlockConfig.INITIAL_LINE_NUMBER) {
+                    appendLine(generateRandomBlockValue())
+                }
+                appendLine("#")
+                repeat(BlockConfig.INITIAL_LINE_NUMBER) {
+                    appendLine(generateRandomBlockValue())
+                }
+            }
+        }
         if (workingDirectory.listDirectoryEntries().size <= 1) {
-            workingDirectory.resolve("test.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test1.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test2.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test3.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test4.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test5.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test6.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test7.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test8.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
-            workingDirectory.resolve("test9.txt")
-                .writeText("#\n${generateRandomBlockValue()}\n#\n${generateRandomBlockValue()}\n")
+            workingDirectory.resolve("test.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test1.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test2.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test3.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test4.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test5.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test6.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test7.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test8.txt").writeText(generateRandomFileText())
+            workingDirectory.resolve("test9.txt").writeText(generateRandomFileText())
+
         }
     }
 
@@ -594,7 +653,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
     init {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     createWorkingDirectory()
                     createTestsFiles()
                     checkActiveBranch()
@@ -609,7 +668,7 @@ class HomeViewModel(private val workingDirectory: Path) : ViewModel() {
                     "HomeScreenViewModel_initialisation",
                     "Could not read files in working directory initial error : ${e.message}"
                 )
-                _homeUiEvent.emit(ShowSnackBar("Could not read files in working directory"))
+                _homeUiEvent.emit(ShowSnackBar(HomeUiEvent.SnackBarMessage.ERROR_VIEWMODEL_INITIALISATION_COULD_NOT_READ_FILE))
             }
         }
     }

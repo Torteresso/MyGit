@@ -5,17 +5,17 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gitPuzzles"
+    namespace = "com.gitPuzzles"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.gitPuzzles"
+        applicationId = "com.gitPuzzles"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -38,11 +38,22 @@ android {
 
 }
 
+
+
 dependencies {
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+
+    // Tests
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.kotlinx.coroutines.test)
+    implementation(libs.slf4j.nop)
+    androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation(libs.androidx.rules)
 
     // Choose one of the following:
     // Material Design 3
@@ -91,4 +102,9 @@ dependencies {
     // GitLogic
     implementation(project(":git-logic"))
 
+}
+
+tasks.withType<Test> {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
 }

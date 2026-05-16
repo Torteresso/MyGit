@@ -1,4 +1,4 @@
-package com.example.gitPuzzles.ui
+package com.gitPuzzles.ui
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
@@ -48,6 +48,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,11 +59,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.example.gitPuzzles.numberToLetter
-import com.example.gitPuzzles.themlng.DarkGreen
-import com.example.gitPuzzles.themlng.Transparent
-import com.example.gitPuzzles.ui.theme.extendedColorScheme
-import com.example.gitPuzzles.ui.theme.toColorFamily
+import com.gitPuzzles.R
+import com.gitPuzzles.numberToLetter
+import com.gitPuzzles.themlng.DarkGreen
+import com.gitPuzzles.themlng.Transparent
+import com.gitPuzzles.ui.theme.extendedColorScheme
+import com.gitPuzzles.ui.theme.toColorFamily
 import gitLogic.FileStatus
 
 @Composable
@@ -137,7 +142,11 @@ fun FileCard(
     val fileBlocksPositionInFractionHeight = 0.3f
     val fileBlocksBottomPaddingInFractionHeight = 0.05f
 
-    Box(modifier = modifier.fillMaxSize())
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("${stringResource(R.string.testTag_fileNumber)} $fileNumber")
+    )
     {
         FileCardInterior(
             fileUiState = fileUiState,
@@ -211,6 +220,7 @@ fun FileCard(
                         y = cardInteriorSurfaceOffset.y.toInt() - nameCircleSize.height / 4
                     )
                 }
+                .clickable(onClick = { onFileClick(fileNumber) })
         )
     }
 }
@@ -229,7 +239,7 @@ fun FileBlockAddAndRemoveButtons(
     FileBlockModificationButton(
         color = color,
         icon = Icons.Default.Remove,
-        iconDescription = "Remove last block",
+        buttonDescription = stringResource(R.string.fileBlock_removeBlockButton_description),
         fileNumber = fileNumber,
         blockNumber = blockNumber,
         modificationFlag = BlockModificationFlag.REMOVE_LINE,
@@ -249,7 +259,7 @@ fun FileBlockAddAndRemoveButtons(
     FileBlockModificationButton(
         color = color,
         icon = Icons.Default.Add,
-        iconDescription = "Add new block",
+        buttonDescription = stringResource(R.string.fileBlock_addBlockButton_description),
         onButtonClick = onButtonClick,
         fileNumber = fileNumber,
         blockNumber = blockNumber,
@@ -273,7 +283,7 @@ fun FileBlockAddAndRemoveButtons(
 fun FileBlockModificationButton(
     color: FileColor,
     icon: ImageVector,
-    iconDescription: String,
+    buttonDescription: String,
     fileNumber: Int,
     blockNumber: Int,
     modificationFlag: BlockModificationFlag,
@@ -284,12 +294,14 @@ fun FileBlockModificationButton(
         shape = CircleShape,
         color = color.toColorFamily().color,
         modifier = modifier
-            .clickable(onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
+            .semantics { contentDescription = "$buttonDescription $blockNumber" }
+            .clickable(
+                onClick = { onButtonClick(fileNumber, blockNumber, modificationFlag) })
 
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = iconDescription,
+            contentDescription = null,
             tint = color.toColorFamily().onColor
         )
 
@@ -307,7 +319,8 @@ fun FileCardNameIndicator(
         color = fileUiState.color.toColorFamily().color,
         contentColor = fileUiState.color.toColorFamily().onColor,
         modifier = modifier
-    ) {
+    )
+    {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = numberToLetter(fileNumber),
@@ -497,6 +510,7 @@ fun SingleFileBlock(block: List<Float>, fileColor: FileColor, modifier: Modifier
                     ),
                     color = fileColor.toColorFamily().color, modifier = Modifier
                         .fillMaxWidth(lineLength)
+                        .semantics { contentDescription = "block_line" }
                         .then(
                             if (this@BoxWithConstraints.maxHeight / block.size > maxLineHeight) Modifier.height(
                                 maxLineHeight
